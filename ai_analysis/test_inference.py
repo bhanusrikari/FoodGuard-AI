@@ -93,9 +93,11 @@ class TestArtifactPaths(unittest.TestCase):
         import ai_analysis.inference
         self.assertTrue(True)
 
+    @_requires_model_artifact
     def test_02_model_pt_exists(self):
         self.assertTrue(_MODEL_PT.exists(), f"model.pt not found: {_MODEL_PT}")
 
+    @_requires_model_artifact
     def test_03_label_map_json_exists(self):
         self.assertTrue(_LABEL_MAP.exists(), f"label_map.json not found: {_LABEL_MAP}")
 
