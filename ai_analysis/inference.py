@@ -32,20 +32,24 @@ import threading
 from pathlib import Path
 from typing import Dict
 
-# ---------------------------------------------------------------------------
-# Paths (resolved relative to this file → project root)
-# ---------------------------------------------------------------------------
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_MODEL_DIR    = _PROJECT_ROOT / "models" / "food_quality"
-_MODEL_PT     = _MODEL_DIR / "model.pt"
-_LABEL_MAP    = _MODEL_DIR / "label_map.json"
-_TRAIN_CFG    = _MODEL_DIR / "train_config.json"
+from django.conf import settings
 
 # ---------------------------------------------------------------------------
-# Confidence threshold below which we always return HUMAN_REVIEW
+# Paths and confidence threshold — sourced from Django settings
+# (FOOD_QUALITY_MODEL_DIR / AI_CONFIDENCE_THRESHOLD, both env-configurable;
+# see config/settings.py). Safe to read at import time: by the time any app
+# module imports this file, Django settings are already configured.
 # ---------------------------------------------------------------------------
-CONFIDENCE_MIN_NORMAL = 0.70   # below this → uncertain / human review
+
+_MODEL_DIR = Path(settings.FOOD_QUALITY_MODEL_DIR)
+_MODEL_PT = _MODEL_DIR / "model.pt"
+_LABEL_MAP = _MODEL_DIR / "label_map.json"
+_TRAIN_CFG = _MODEL_DIR / "train_config.json"
+
+# Confidence threshold below which we always return HUMAN_REVIEW.
+# 0.70 is the default (see AI_CONFIDENCE_THRESHOLD in settings) — the value
+# already validated when this model was trained; not changed here.
+CONFIDENCE_MIN_NORMAL = settings.AI_CONFIDENCE_THRESHOLD
 
 # ---------------------------------------------------------------------------
 # Risk mapping: predicted class → AIAnalysis.Risk value

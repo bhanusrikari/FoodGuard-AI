@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.request import Request
@@ -24,6 +25,10 @@ _PROTECTED_FIELDS = {
 }
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: ComplaintReadSerializer(many=True)}),
+    post=extend_schema(request=ComplaintCreateSerializer, responses={201: ComplaintReadSerializer, 400: dict}),
+)
 class ComplaintListCreateView(APIView):
     """
     GET  /api/v1/complaints/  — list complaints (filtered by role)
@@ -70,6 +75,14 @@ class ComplaintListCreateView(APIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: ComplaintReadSerializer, 404: dict}),
+    patch=extend_schema(
+        request=ComplaintUpdateSerializer,
+        responses={200: ComplaintReadSerializer, 400: dict, 403: dict, 404: dict},
+        description="REVIEWER/ADMIN only — status, priority, resolution_notes.",
+    ),
+)
 class ComplaintDetailView(APIView):
     """
     GET   /api/v1/complaints/<id>/

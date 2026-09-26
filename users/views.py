@@ -1,4 +1,5 @@
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -25,7 +26,13 @@ class RegisterView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_scope = "auth_anon"
 
+    @extend_schema(
+        request=RegisterSerializer,
+        responses={201: UserResponseSerializer, 400: dict},
+        description="Public registration. Always creates a CUSTOMER account.",
+    )
     def post(self, request: Request) -> Response:
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
@@ -60,7 +67,28 @@ class LoginView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_scope = "auth_anon"
 
+    @extend_schema(
+        request=LoginSerializer,
+        responses={
+            200: inline_serializer(
+                name="LoginResponse",
+                fields={
+                    "access": serializers.CharField(),
+                    "refresh": serializers.CharField(),
+                    "id": serializers.IntegerField(),
+                    "email": serializers.EmailField(),
+                    "first_name": serializers.CharField(),
+                    "last_name": serializers.CharField(),
+                    "role": serializers.CharField(),
+                    "preferred_language": serializers.CharField(),
+                },
+            ),
+            401: dict,
+        },
+        description="Public login. Returns JWT access + refresh tokens plus basic user info.",
+    )
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(
             data=request.data, context={"request": request}
@@ -97,6 +125,7 @@ class ProfileView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: UserResponseSerializer})
     def get(self, request: Request) -> Response:
         serializer = UserResponseSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -112,6 +141,10 @@ class LogoutView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=LogoutSerializer,
+        responses={200: dict, 400: dict},
+    )
     def post(self, request: Request) -> Response:
         serializer = LogoutSerializer(data=request.data)
         if not serializer.is_valid():

@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.request import Request
@@ -18,6 +19,14 @@ from users.models import User
 _REVIEWER_ADMIN = {User.Role.REVIEWER, User.Role.ADMIN}
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: FoodReportReadSerializer(many=True)}),
+    post=extend_schema(
+        request=FoodReportCreateSerializer,
+        responses={201: FoodReportReadSerializer, 400: dict},
+        description="multipart/form-data — `image` is an optional file field.",
+    ),
+)
 class ReportListCreateView(APIView):
     """
     GET  /api/v1/reports/  — list reports
@@ -60,6 +69,15 @@ class ReportListCreateView(APIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: FoodReportReadSerializer, 404: dict}),
+    patch=extend_schema(
+        request=FoodReportUpdateSerializer,
+        responses={200: FoodReportReadSerializer, 400: dict, 403: dict, 404: dict},
+        description="multipart/form-data — DRAFT reports owned by the requesting customer only.",
+    ),
+    delete=extend_schema(responses={204: None, 403: dict, 404: dict}),
+)
 class ReportDetailView(APIView):
     """
     GET    /api/v1/reports/<id>/
@@ -177,6 +195,9 @@ class ReportDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    post=extend_schema(request=None, responses={200: FoodReportReadSerializer, 400: dict, 403: dict, 404: dict}),
+)
 class ReportSubmitView(APIView):
     """
     POST /api/v1/reports/<id>/submit/

@@ -88,7 +88,7 @@ class EscalationService:
         if assigned_to_user is not None:
             self._check_assignee_role(assigned_to_user)
 
-        return Escalation.objects.create(
+        escalation = Escalation.objects.create(
             complaint=complaint,
             created_by=requesting_user,
             assigned_to=assigned_to_user,
@@ -97,6 +97,25 @@ class EscalationService:
             original_language=requesting_user.preferred_language,
             status=Escalation.Status.PENDING,
         )
+
+        from notifications.models import Notification
+        from notifications.services import NotificationService
+        message = f"Escalation created for complaint \"{complaint.title}\"."
+        if assigned_to_user is not None:
+            NotificationService().notify(
+                recipient=assigned_to_user,
+                event_type=Notification.EventType.ESCALATION_CREATED,
+                message=message,
+                related_complaint=complaint,
+            )
+        else:
+            NotificationService().notify_reviewers_and_admins(
+                event_type=Notification.EventType.ESCALATION_CREATED,
+                message=message,
+                related_complaint=complaint,
+            )
+
+        return escalation
 
     # ------------------------------------------------------------------
     # Update
@@ -122,6 +141,21 @@ class EscalationService:
             escalation.resolved_at = None
 
         escalation.save()
+
+        from notifications.models import Notification
+        from notifications.services import NotificationService
+        message = f"Escalation for complaint \"{escalation.complaint.title}\" was updated."
+        notified_ids = set()
+        for recipient in [escalation.created_by, escalation.assigned_to]:
+            if recipient is not None and recipient.pk not in notified_ids:
+                NotificationService().notify(
+                    recipient=recipient,
+                    event_type=Notification.EventType.ESCALATION_UPDATED,
+                    message=message,
+                    related_complaint=escalation.complaint,
+                )
+                notified_ids.add(recipient.pk)
+
         return escalation
 
     # ------------------------------------------------------------------

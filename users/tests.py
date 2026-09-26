@@ -11,6 +11,7 @@ FoodGuard AI — users app test suite.
   - Security invariants (no password in response, role protection)
 """
 
+from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -138,6 +139,15 @@ class TestUserCreation(APITestCase):
 
 class TestRegistration(APITestCase):
 
+    def setUp(self):
+        # /auth/register/ is throttle-scoped (see users.views.RegisterView).
+        # DRF's throttle cache persists across test methods within a run
+        # (it's a plain Django cache, not reset by APITestCase), so without
+        # clearing it here this class's own repeated real HTTP calls to the
+        # same endpoint would eventually trip the rate limit and fail with
+        # 429 instead of the assertion each test actually intends to check.
+        cache.clear()
+
     # ------------------------------------------------------------------
     # 7. Public registration
     # ------------------------------------------------------------------
@@ -241,6 +251,7 @@ class TestRegistration(APITestCase):
 class TestLogin(APITestCase):
 
     def setUp(self):
+        cache.clear()  # see TestRegistration.setUp — same throttle-cache reason
         self.user = make_user()
 
     # ------------------------------------------------------------------

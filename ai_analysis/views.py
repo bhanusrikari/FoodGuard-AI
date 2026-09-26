@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -18,6 +19,17 @@ def _get_report_or_404(report_id: int):
         return None
 
 
+@extend_schema_view(
+    post=extend_schema(
+        request=None,
+        responses={200: AIAnalysisSerializer, 400: dict, 403: dict, 404: dict},
+        description=(
+            "Runs (or re-runs) preliminary AI visual assessment for a report. "
+            "Falls back to a mock result when the real model artifact isn't "
+            "configured; see ai_analysis.services for the dispatch logic."
+        ),
+    ),
+)
 class AnalyzeReportView(APIView):
     """
     POST /api/v1/reports/<report_id>/analyze/
@@ -61,6 +73,9 @@ class AnalyzeReportView(APIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: AIAnalysisSerializer, 403: dict, 404: dict}),
+)
 class ReportAnalysisView(APIView):
     """
     GET /api/v1/reports/<report_id>/analysis/

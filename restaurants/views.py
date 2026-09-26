@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -20,6 +21,10 @@ _RESTRICTED_UPDATE_FIELDS = {"is_verified"}
 _PRIVILEGED_ROLES = {User.Role.REVIEWER, User.Role.ADMIN}
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: RestaurantReadSerializer(many=True)}),
+    post=extend_schema(request=RestaurantCreateSerializer, responses={201: RestaurantReadSerializer, 400: dict}),
+)
 class RestaurantListCreateView(APIView):
     """
     GET  /api/v1/restaurants/   — list all active restaurants (authenticated)
@@ -52,6 +57,11 @@ class RestaurantListCreateView(APIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: RestaurantReadSerializer, 404: dict}),
+    patch=extend_schema(request=RestaurantUpdateSerializer, responses={200: RestaurantReadSerializer, 400: dict, 403: dict, 404: dict}),
+    delete=extend_schema(responses={204: None, 404: dict}),
+)
 class RestaurantDetailView(APIView):
     """
     GET    /api/v1/restaurants/<id>/  — retrieve restaurant

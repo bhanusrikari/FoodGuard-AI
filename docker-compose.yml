@@ -18,6 +18,29 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # NOT built/started as part of this change — see Dockerfile header for
+  # what this image does and does not solve (media serving, model.pt).
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: foodguard_backend
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set a real secret key}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-127.0.0.1,localhost}
+      DATABASE_NAME: foodguard_db
+      DATABASE_USER: foodguard_user
+      DATABASE_PASSWORD: foodguard_password
+      DATABASE_HOST: foodguard_db_new
+      DATABASE_PORT: "5432"
+    ports:
+      - "8000:8000"
+    depends_on:
+      foodguard_db_new:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   foodguard_postgres_data_new:
     name: foodguard_postgres_data_new

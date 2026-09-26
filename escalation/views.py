@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.request import Request
@@ -20,6 +21,10 @@ _IMMUTABLE_FIELDS = {
 }
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: EscalationReadSerializer(many=True)}),
+    post=extend_schema(request=EscalationCreateSerializer, responses={201: EscalationReadSerializer, 400: dict}),
+)
 class EscalationListCreateView(APIView):
     """
     GET  /api/v1/escalations/  — list escalations (REVIEWER/ADMIN only)
@@ -58,6 +63,10 @@ class EscalationListCreateView(APIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: EscalationReadSerializer, 404: dict}),
+    patch=extend_schema(request=EscalationUpdateSerializer, responses={200: EscalationReadSerializer, 400: dict, 404: dict}),
+)
 class EscalationDetailView(APIView):
     """
     GET   /api/v1/escalations/<id>/

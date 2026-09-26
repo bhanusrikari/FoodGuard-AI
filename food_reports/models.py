@@ -1,5 +1,19 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
+
+
+def _report_image_upload_path(instance, filename: str) -> str:
+    """
+    Randomized filename so a report's image URL can't be guessed from a
+    sequential/original name — the API's own object-level permissions are
+    what should gate access, not obscurity, but an unguessable name closes
+    the "just guess the next filename" exposure vector.
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    name = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
+    return f"food_reports/{name}"
 
 
 class FoodReport(models.Model):
@@ -73,7 +87,7 @@ class FoodReport(models.Model):
     description = models.TextField(verbose_name="description")
 
     image = models.ImageField(
-        upload_to="food_reports/",
+        upload_to=_report_image_upload_path,
         blank=True,
         null=True,
         verbose_name="image",

@@ -64,6 +64,20 @@ VALID_RISKS   = {r.value for r in AIAnalysis.Risk}
 VALID_CLASSES = {"normal", "spoilage_indicator", "mold_like_growth", "uncertain"}
 FORBIDDEN_KEYS = {"password", "secret_key", "token", "hash"}
 
+# Real-model artifacts (model.pt / label_map.json) are gitignored and may not
+# exist on every machine. When absent, model-dependent tests below report
+# SKIPPED (not FAILED/ERROR) with this reason — TestArtifactPaths is the one
+# test class left unskipped, so its failure is the single clear signal that
+# real-model integration is pending real artifacts.
+_MODEL_ARTIFACT_MISSING_REASON = (
+    None if (_MODEL_PT.exists() and _LABEL_MAP.exists())
+    else "model.pt/label_map.json not present — real-model integration pending"
+)
+
+
+def _requires_model_artifact(obj):
+    return unittest.skipIf(_MODEL_ARTIFACT_MISSING_REASON, _MODEL_ARTIFACT_MISSING_REASON)(obj)
+
 
 def _make_solid_png(color=(200, 180, 120)) -> bytes:
     """Create a minimal valid RGB PNG in memory."""
@@ -86,6 +100,7 @@ class TestArtifactPaths(unittest.TestCase):
         self.assertTrue(_LABEL_MAP.exists(), f"label_map.json not found: {_LABEL_MAP}")
 
 
+@_requires_model_artifact
 class TestModelLoading(unittest.TestCase):
 
     def test_04_load_artifacts_succeeds(self):
@@ -116,6 +131,7 @@ class TestModelLoading(unittest.TestCase):
         self.assertIs(m1, m2)
 
 
+@_requires_model_artifact
 class TestInferenceOutput(unittest.TestCase):
 
     @classmethod
@@ -161,6 +177,7 @@ class TestInferenceOutput(unittest.TestCase):
             self.assertNotIn(k, self.result)
 
 
+@_requires_model_artifact
 class TestLowConfidenceHumanReview(unittest.TestCase):
     """Patch model to return near-uniform probabilities → low confidence."""
 
@@ -191,6 +208,7 @@ class TestLowConfidenceHumanReview(unittest.TestCase):
             _inf_module._model = original_model
 
 
+@_requires_model_artifact
 class TestCorruptImageFallback(unittest.TestCase):
 
     def test_16_missing_image_returns_human_review(self):
@@ -207,6 +225,7 @@ class TestCorruptImageFallback(unittest.TestCase):
 
 class TestMessageTerminology(unittest.TestCase):
 
+    @_requires_model_artifact
     def test_19_message_does_not_claim_scientific_certainty(self):
         """No result message should claim the food is 'definitely' unsafe."""
         _inf_module._load_artifacts()
@@ -229,6 +248,7 @@ class TestMessageTerminology(unittest.TestCase):
 class TestServiceIntegration(unittest.TestCase):
     """Tests AIAnalysisService._run_analysis dispatching."""
 
+    @_requires_model_artifact
     def test_21_service_uses_real_model_when_artifact_exists(self):
         """When model.pt exists, _run_analysis must call _run_real_analysis."""
         svc = AIAnalysisService()

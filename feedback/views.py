@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.request import Request
@@ -13,6 +14,10 @@ from feedback.services import FeedbackError
 _PRIVILEGED_ROLES = {User.Role.REVIEWER, User.Role.ADMIN}
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: FeedbackReadSerializer(many=True)}),
+    post=extend_schema(request=FeedbackCreateSerializer, responses={201: FeedbackReadSerializer, 400: dict}),
+)
 class FeedbackListCreateView(APIView):
     """
     GET  /api/v1/feedback/  — list feedback (role-filtered)
@@ -57,6 +62,9 @@ class FeedbackListCreateView(APIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: FeedbackReadSerializer, 404: dict}),
+)
 class FeedbackDetailView(APIView):
     """
     GET /api/v1/feedback/<id>/

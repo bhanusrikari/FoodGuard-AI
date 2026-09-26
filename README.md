@@ -436,19 +436,66 @@ SUBMITTED → UNDER_REVIEW → RESOLVED → CLOSED
 > Results from this service are NOT scientific food-safety certifications,
 > proof of contamination, or evidence of restaurant wrongdoing.
 > They indicate possible visible concerns that require human review.
+> The current model provides visual classification based on the trained
+> dataset and does not constitute laboratory confirmation or definitive
+> food-safety certification.
 
-### Current Implementation: Mock Mode
+### Architecture
 
-The AI Analysis Service is a clean abstraction layer.
-The **current implementation is a deterministic mock** — it returns a
-fixed structured result that clearly identifies itself as mock mode.
+```
+AIAnalysisService
+        │
+        ▼
+_run_real_analysis()  ──▶  ai_analysis.inference.run_inference()  ──▶  model.pt
+        │
+        ▼ (when model.pt / label_map.json are absent)
+   deterministic mock result
+```
 
-- **No real ML model is integrated.**
-- **No datasets are downloaded or trained.**
-- **No external AI APIs are called.**
-- Replacing the mock with a real visual model requires only changing
-  `_run_analysis()` in `ai_analysis/services.py` — no view or serializer
-  changes needed.
+`AIAnalysisService._run_analysis()` automatically dispatches to the real
+model when its artifacts exist on disk, and falls back to a deterministic
+mock otherwise — no view, serializer, or API contract changes needed
+either way.
+
+### Model configuration
+
+| Setting | Env var | Default | Meaning |
+|---|---|---|---|
+| `FOOD_QUALITY_MODEL_DIR` | `FOOD_QUALITY_MODEL_DIR` | `<project_root>/models/food_quality/` | Directory containing `model.pt`, `label_map.json`, `train_config.json` |
+| `AI_CONFIDENCE_THRESHOLD` | `AI_CONFIDENCE_THRESHOLD` | `0.70` | Below this confidence, the result is forced to `risk=HUMAN_REVIEW` regardless of predicted class |
+
+**Current status on this machine: the real model artifacts do not exist.**
+`ai_analysis/inference.py` and its test suite (`ai_analysis/test_inference.py`)
+already implement the real-model path in full (MobileNetV3-Small backbone,
+singleton thread-safe CPU-only load, no-grad inference, confidence-gated
+`HUMAN_REVIEW`), but were developed on a different machine whose trained
+`model.pt` was never transferred here. The service falls back to the mock
+below until real artifacts are placed at `FOOD_QUALITY_MODEL_DIR`. Installing
+`torch`/`torchvision` is **not required** to run this backend today — see
+the commented block in `requirements.txt` for the install command once a
+real model is provided.
+
+### Model classes (once real model is present)
+
+`normal` · `spoilage_indicator` · `mold_like_growth` — a 3-class classifier.
+No other classes (foreign object, pest, packaging, hygiene, etc.) are
+implemented; see `docs/datasets/quality_dataset_plan.md` for the full
+planned taxonomy, which remains unbuilt.
+
+### HUMAN_REVIEW meaning
+
+`HUMAN_REVIEW` is a `risk` value (not a separate `status`) — the analysis
+still completes successfully (`status=COMPLETED`), but the model's own
+confidence for that image fell below `AI_CONFIDENCE_THRESHOLD`, so the
+result explicitly says a human should look at it rather than presenting an
+uncertain guess as if it were definitive.
+
+### Limitations
+
+- No real trained model exists on this machine (see above).
+- The 3 classes cover food-quality/spoilage/mold only — not the full
+  taxonomy planned in `docs/datasets/`.
+- Confidence is a raw softmax score, not a calibrated probability.
 
 ### Mock Result (current)
 
@@ -488,6 +535,73 @@ without overwriting the stored originals.
 
 ---
 
+## Translation Service
+
+`translation/services.py` provides a `TranslationService` abstraction with a
+provider registry (`TRANSLATION_PROVIDER` env var, default `"none"`). No
+real provider is configured — calling `TranslationService().translate(...)`
+always returns an explicit `status="unavailable"` result (never a fabricated
+translation) until a real provider is registered. Nothing in the codebase
+calls it yet; it exists as the seam for future translation work described
+throughout this README.
+
+---
+
+## Notifications
+
+`notifications/` records in-app events as plain DB rows — no realtime/queue
+infrastructure; clients poll `GET /api/v1/notifications/`.
+
+| Method | URL | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/notifications/` | Any authenticated user | Own notifications, newest first |
+| `PATCH` | `/api/v1/notifications/<id>/` | Owner only | Toggle `is_read` |
+
+Events recorded: report submitted (→ reviewers/admins), AI analysis
+completed (→ report's customer), complaint submitted (→ reviewers/admins),
+complaint status changed (→ complaint's customer), escalation created (→
+assignee or reviewers/admins), escalation updated (→ creator + assignee).
+
+---
+
+## Analytics
+
+`GET /api/v1/analytics/summary/` (REVIEWER/ADMIN only) — reports/complaints
+counts by status and priority, AI analysis counts by status and risk,
+restaurant totals and pending-verification count. Every number is a direct
+database aggregation (`Count` + `annotate`) — no fabricated trends or
+percentages, and the query count does not scale with row count. Not wired
+into the frontend, which still computes its own client-side counts.
+
+---
+
+## API Documentation
+
+OpenAPI schema and interactive docs (via `drf-spectacular`):
+
+- `GET /api/schema/` — raw OpenAPI 3 schema
+- `GET /api/docs/` — Swagger UI
+- `GET /api/redoc/` — ReDoc UI
+
+---
+
+## Deployment
+
+- `Dockerfile` builds a gunicorn-served backend image. `docker-compose.yml`
+  adds a `backend` service alongside the existing Postgres service.
+- **Not built or run as part of this repository's development so far** —
+  Docker isn't installed in this dev environment; review before relying on
+  it.
+- `GET /healthz/` — unauthenticated container health check (verifies DB
+  connectivity).
+- **Known gap**: Django only serves `/media/` when `DEBUG=True`. A real
+  deployment needs nginx / whitenoise / object storage in front of the
+  container for uploaded report images to be reachable at all.
+- The real `model.pt` is never baked into the image — mount it as a volume
+  at `FOOD_QUALITY_MODEL_DIR` once a real trained model exists.
+
+---
+
 ## Run Tests
 
 ```bash
@@ -497,7 +611,8 @@ python manage.py test feedback --verbosity 2
 # Complaint tests (38 tests)
 python manage.py test complaints --verbosity 2
 
-# AI analysis tests (25 tests)
+# AI analysis tests (25 mock-boundary tests; test_inference.py adds real-model
+# tests that report SKIPPED until model.pt/label_map.json exist)
 python manage.py test ai_analysis --verbosity 2
 
 # All food report tests (39 tests)
@@ -508,6 +623,21 @@ python manage.py test users --verbosity 2
 
 # Restaurant tests (22 tests)
 python manage.py test restaurants --verbosity 2
+
+# Escalation tests (38 tests)
+python manage.py test escalation --verbosity 2
+
+# Notifications tests (13 tests)
+python manage.py test notifications --verbosity 2
+
+# Analytics tests (8 tests)
+python manage.py test analytics --verbosity 2
+
+# Translation tests (6 tests)
+python manage.py test translation --verbosity 2
+
+# Full suite
+python manage.py test --verbosity 1
 ```
 
 ---
@@ -522,10 +652,12 @@ Registered models: User, Restaurant, FoodReport — each with search, filters, a
 
 ## Not Yet Implemented
 
-- Real ML visual food-recognition model (mock in place; real integration in Step 10+)
-- Dataset download (plan and validation foundation ready; no data downloaded)
-- Evidence
-- Notifications
-- Analytics
-- TranslationService (language plumbing is in place; translation calls are not)
-- Frontend
+- Real ML visual food-recognition model — architecture and inference code exist
+  (`ai_analysis/inference.py`), but no trained `model.pt` exists on this machine
+  and no dataset has been collected (see `docs/datasets/` — status: planned)
+- Expanded food-quality classes beyond normal/spoilage/mold (see `docs/datasets/quality_dataset_plan.md`)
+- Food-101 general food recognition, foreign-object/pest/packaging/hygiene datasets
+- A real TranslationService provider (abstraction exists; provider is "none")
+- Evidence (dedicated evidence-attachment model, beyond the FoodReport image)
+- A real deployment (Dockerfile/compose exist but are untested — no Docker on this dev machine)
+- Production media serving (nginx/whitenoise/object storage in front of Django)

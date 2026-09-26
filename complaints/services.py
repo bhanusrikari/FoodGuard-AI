@@ -95,7 +95,7 @@ class ComplaintService:
         self._check_report_submitted(food_report)
         self._check_no_existing_complaint(food_report)
 
-        return Complaint.objects.create(
+        complaint = Complaint.objects.create(
             food_report=food_report,
             customer=requesting_user,
             # Derived server-side — never from the client
@@ -107,6 +107,16 @@ class ComplaintService:
             status=Complaint.Status.SUBMITTED,
             priority=Complaint.Priority.LOW,
         )
+
+        from notifications.models import Notification
+        from notifications.services import NotificationService
+        NotificationService().notify_reviewers_and_admins(
+            event_type=Notification.EventType.COMPLAINT_SUBMITTED,
+            message=f"New complaint filed: \"{complaint.title}\".",
+            related_complaint=complaint,
+        )
+
+        return complaint
 
     # ------------------------------------------------------------------
     # Update (reviewer / admin only)
@@ -121,8 +131,9 @@ class ComplaintService:
         - resolved_at bookkeeping
         """
         new_status = validated_data.get("status")
+        status_changed = bool(new_status and new_status != complaint.status)
 
-        if new_status and new_status != complaint.status:
+        if status_changed:
             self._check_status_transition(complaint.status, new_status)
 
         for attr, value in validated_data.items():
@@ -137,6 +148,20 @@ class ComplaintService:
             complaint.resolved_at = None
 
         complaint.save()
+
+        if status_changed:
+            from notifications.models import Notification
+            from notifications.services import NotificationService
+            NotificationService().notify(
+                recipient=complaint.customer,
+                event_type=Notification.EventType.COMPLAINT_STATUS_CHANGED,
+                message=(
+                    f"Your complaint \"{complaint.title}\" status changed to "
+                    f"{complaint.get_status_display()}."
+                ),
+                related_complaint=complaint,
+            )
+
         return complaint
 
     # ------------------------------------------------------------------

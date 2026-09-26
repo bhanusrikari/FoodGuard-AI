@@ -19,3 +19,13 @@ psycopg2-binary==2.9.10
 
 # Image processing
 Pillow==11.3.0
+
+# API documentation (OpenAPI/Swagger)
+drf-spectacular==0.28.0
+
+# ------------------------------------------------------------------
+# AI model inference — NOT required for this backend to run today.
+# ai_analysis falls back to a mock result when models/food_quality/model.pt
+# is absent. Install these ONLY once a real trained model is provided:
+#   pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
+# ------------------------------------------------------------------

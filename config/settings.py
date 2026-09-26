@@ -8,6 +8,8 @@ from datetime import timedelta
 from pathlib import Path
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 
 # ============================================================
 # BASE DIRECTORY
@@ -20,17 +22,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY
 # ============================================================
 
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-foodguard-dev-only-change-in-production",
-)
+_INSECURE_DEFAULT_SECRET_KEY = "django-insecure-foodguard-dev-only-change-in-production"
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", _INSECURE_DEFAULT_SECRET_KEY)
 
 DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() == "true"
 
+if not DEBUG and SECRET_KEY == _INSECURE_DEFAULT_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be set to a real secret when DJANGO_DEBUG=False. "
+        "Refusing to start with the insecure development default in production."
+    )
+
+_default_allowed_hosts = "127.0.0.1,localhost"
 ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
+    h.strip()
+    for h in os.getenv("DJANGO_ALLOWED_HOSTS", _default_allowed_hosts).split(",")
+    if h.strip()
 ]
+
+# Production-only hardening. Left off under DEBUG so the local dev workflow
+# (plain HTTP on localhost) is completely unaffected.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.getenv("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true"
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    CSRF_TRUSTED_ORIGINS = [
+        o.strip() for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
+    ]
+
+# Safe under HTTP too — always on.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Defense-in-depth above the 5 MB app-level check in food_reports.services.validate_report_image.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 
 
 # ============================================================
@@ -51,6 +80,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "drf_spectacular",
 
     # FoodGuard apps
     "users",
@@ -60,6 +90,9 @@ INSTALLED_APPS = [
     "complaints",
     "escalation",
     "feedback",
+    "translation",
+    "notifications",
+    "analytics",
 ]
 
 
@@ -210,6 +243,27 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Applied only to views that opt in via `throttle_scope` (auth login/register).
+        # Unscoped views are unaffected — DRF only throttles a view when its
+        # throttle class's scope is set and a matching rate exists here.
+        "auth_anon": "10/min",
+    },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "FoodGuard AI API",
+    "DESCRIPTION": (
+        "Food safety reporting, complaint management, and preliminary AI visual "
+        "assessment API. AI results are preliminary visual assessments only — "
+        "not a scientific food-safety certification."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 
@@ -254,6 +308,64 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+
+# ============================================================
+# AI ANALYSIS — food-quality model configuration
+# ============================================================
+# Model artifacts (model.pt / label_map.json / train_config.json) are never
+# committed to the repo (see .gitignore) and may not exist on every machine —
+# ai_analysis falls back to the mock implementation when they're absent.
+
+FOOD_QUALITY_MODEL_DIR = Path(
+    os.getenv("FOOD_QUALITY_MODEL_DIR", str(BASE_DIR / "models" / "food_quality"))
+)
+
+# Below this confidence, AI results are forced to HUMAN_REVIEW regardless of
+# the predicted class. 0.70 is the value already validated when this model
+# was trained; not changed here.
+AI_CONFIDENCE_THRESHOLD = float(os.getenv("AI_CONFIDENCE_THRESHOLD", "0.70"))
+
+
+# ============================================================
+# TRANSLATION SERVICE
+# ============================================================
+# Provider abstraction only — "none" (the default) means TranslationService
+# always returns an explicit "unavailable" result rather than fabricating a
+# translation. Set to a real provider name once one is actually configured.
+
+TRANSLATION_PROVIDER = os.getenv("TRANSLATION_PROVIDER", "none")
+
+
+# ============================================================
+# LOGGING
+# ============================================================
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "foodguard": {
+            "handlers": ["console"],
+            "level": os.getenv("FOODGUARD_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
+}
 
 
 # ============================================================

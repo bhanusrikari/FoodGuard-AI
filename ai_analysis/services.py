@@ -29,13 +29,16 @@ They do NOT constitute:
 No external APIs.  No retraining.  No datasets.  No OCR.
 """
 
-import os
+import logging
 from pathlib import Path
 
+from django.conf import settings
 from django.utils import timezone
 
 from food_reports.models import FoodReport
 from ai_analysis.models import AIAnalysis
+
+logger = logging.getLogger("foodguard")
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -47,11 +50,12 @@ class AnalysisError(Exception):
 
 # ---------------------------------------------------------------------------
 # Model-artifact paths (used to detect whether real model exists)
+# Sourced from FOOD_QUALITY_MODEL_DIR (env-configurable; see settings.py).
 # ---------------------------------------------------------------------------
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_MODEL_PT     = _PROJECT_ROOT / "models" / "food_quality" / "model.pt"
-_LABEL_MAP    = _PROJECT_ROOT / "models" / "food_quality" / "label_map.json"
+_MODEL_DIR = Path(settings.FOOD_QUALITY_MODEL_DIR)
+_MODEL_PT     = _MODEL_DIR / "model.pt"
+_LABEL_MAP    = _MODEL_DIR / "label_map.json"
 
 
 # ---------------------------------------------------------------------------
@@ -105,11 +109,30 @@ class AIAnalysisService:
             analysis.model_version = result["model_version"]
             analysis.analyzed_at = timezone.now()
             analysis.save()
+
+            from notifications.models import Notification
+            from notifications.services import NotificationService
+            NotificationService().notify(
+                recipient=food_report.customer,
+                event_type=Notification.EventType.AI_ANALYSIS_COMPLETED,
+                message=f"AI analysis is ready for your report \"{food_report.title}\".",
+                related_report=food_report,
+            )
         except Exception as exc:
+            # Log full detail server-side only — never expose internal
+            # exception text, file paths, or stack traces to the API client
+            # or persist them in a field the client can read back.
+            logger.exception(
+                "AI analysis failed for food_report_id=%s", food_report.pk
+            )
+            safe_message = (
+                "AI analysis could not be completed due to an internal error. "
+                "Please try again later."
+            )
             analysis.status  = AIAnalysis.Status.FAILED
-            analysis.message = f"Analysis failed: {exc}"
+            analysis.message = safe_message
             analysis.save()
-            raise AnalysisError(str(exc)) from exc
+            raise AnalysisError(safe_message) from exc
 
         return analysis
 

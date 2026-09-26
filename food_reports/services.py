@@ -153,6 +153,15 @@ class FoodReportSubmissionService:
 
         self.report.status = FoodReport.Status.SUBMITTED
         self.report.save(update_fields=["status", "updated_at"])
+
+        from notifications.models import Notification
+        from notifications.services import NotificationService
+        NotificationService().notify_reviewers_and_admins(
+            event_type=Notification.EventType.REPORT_SUBMITTED,
+            message=f"New food safety report submitted: \"{self.report.title}\".",
+            related_report=self.report,
+        )
+
         return self.report
 
     # ------------------------------------------------------------------
