@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Building2, Plus } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { RestaurantCard } from '@/components/restaurants/RestaurantCard'
@@ -6,7 +5,7 @@ import { Reveal } from '@/components/motion/Reveal'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { ListSkeleton } from '@/components/states/LoadingSkeleton'
-import { Button } from '@/components/ui/Button'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { useAuth } from '@/context/AuthContext'
 import { useRestaurants } from '@/hooks/useRestaurants'
 
@@ -23,12 +22,10 @@ export default function RestaurantDashboard() {
           <h2 className="text-xl font-semibold text-neutral-900">My Restaurants</h2>
           <p className="mt-1 text-sm text-neutral-500">Manage the restaurants you own on FoodGuard AI.</p>
         </div>
-        <Link to="/restaurant/new">
-          <Button>
-            <Plus className="size-4" aria-hidden="true" />
-            Add Restaurant
-          </Button>
-        </Link>
+        <LinkButton to="/restaurant/new">
+          <Plus className="size-4" aria-hidden="true" />
+          Add Restaurant
+        </LinkButton>
       </div>
 
       {isLoading && <ListSkeleton items={3} />}
@@ -38,11 +35,7 @@ export default function RestaurantDashboard() {
           icon={<Building2 className="size-6" aria-hidden="true" />}
           title="No restaurants yet"
           description="Register your restaurant to appear on FoodGuard AI and manage its profile."
-          action={
-            <Link to="/restaurant/new">
-              <Button size="sm">Add Restaurant</Button>
-            </Link>
-          }
+          action={<LinkButton to="/restaurant/new" size="sm">Add Restaurant</LinkButton>}
         />
       )}
       {myRestaurants.length > 0 && (

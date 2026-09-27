@@ -230,6 +230,14 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Django's static() helper (wired up in config/urls.py) is not efficient at
+# real scale, but for this MVP — no reverse proxy or object storage in
+# front of the container yet — it is the minimum needed to make uploaded
+# report images reachable at all outside DEBUG. Set this to False once
+# nginx / a CDN / object storage takes over serving MEDIA_URL directly, per
+# the Dockerfile's deployment notes.
+SERVE_MEDIA_VIA_DJANGO = os.getenv("SERVE_MEDIA_VIA_DJANGO", "True").lower() == "true"
+
 
 # ============================================================
 # DJANGO REST FRAMEWORK

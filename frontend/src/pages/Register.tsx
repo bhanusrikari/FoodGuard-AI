@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
+import { useTranslation } from '@/i18n/LanguageContext'
 import { registerSchema, type RegisterFormValues } from '@/lib/schemas'
 import { LANGUAGE_LABELS } from '@/types/user'
 import { toApiError } from '@/types/errors'
@@ -14,6 +15,7 @@ import { toApiError } from '@/types/errors'
 export default function Register() {
   const { register: registerUser } = useAuth()
   const navigate = useNavigate()
+  const t = useTranslation()
   const [formError, setFormError] = useState<string | null>(null)
 
   const {
@@ -36,14 +38,14 @@ export default function Register() {
   }
 
   return (
-    <AuthLayout title="Create your account" subtitle="Report food safety concerns in your community">
+    <AuthLayout title={t('auth.register.title')} subtitle={t('auth.register.subtitle')}>
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <Input label="First name" required error={errors.first_name?.message} {...register('first_name')} />
-          <Input label="Last name" required error={errors.last_name?.message} {...register('last_name')} />
+          <Input label={t('auth.register.firstName')} required error={errors.first_name?.message} {...register('first_name')} />
+          <Input label={t('auth.register.lastName')} required error={errors.last_name?.message} {...register('last_name')} />
         </div>
         <Input
-          label="Email"
+          label={t('auth.register.email')}
           type="email"
           autoComplete="email"
           required
@@ -51,16 +53,16 @@ export default function Register() {
           {...register('email')}
         />
         <Input
-          label="Password"
+          label={t('auth.register.password')}
           type="password"
           autoComplete="new-password"
           required
-          hint="At least 8 characters."
+          hint={t('auth.register.passwordHint')}
           error={errors.password?.message}
           {...register('password')}
         />
-        <Input label="Phone (optional)" type="tel" error={errors.phone?.message} {...register('phone')} />
-        <Select label="Preferred language" error={errors.preferred_language?.message} {...register('preferred_language')}>
+        <Input label={t('auth.register.phone')} type="tel" error={errors.phone?.message} {...register('phone')} />
+        <Select label={t('auth.register.preferredLanguage')} error={errors.preferred_language?.message} {...register('preferred_language')}>
           {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
             <option key={code} value={code}>
               {label}
@@ -73,13 +75,13 @@ export default function Register() {
           </p>
         )}
         <Button type="submit" className="w-full" isLoading={isSubmitting}>
-          Create account
+          {t('auth.register.submit')}
         </Button>
       </form>
       <p className="mt-6 text-center text-sm text-neutral-500">
-        Already have an account?{' '}
+        {t('auth.register.haveAccount')}{' '}
         <Link to="/login" className="font-medium text-primary-700 hover:underline">
-          Sign in
+          {t('auth.register.signIn')}
         </Link>
       </p>
     </AuthLayout>

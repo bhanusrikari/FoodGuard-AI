@@ -9,18 +9,21 @@ import { AIDisclaimer } from '@/components/ai/AIDisclaimer'
 import { StatusBadge } from '@/components/badges/StatusBadge'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { ErrorState } from '@/components/states/ErrorState'
 import { Skeleton } from '@/components/states/LoadingSkeleton'
 import { Reveal } from '@/components/motion/Reveal'
 import { useDeleteReport, useReport, useSubmitReport } from '@/hooks/useReports'
 import { useAIAnalysis, useRunAIAnalysis } from '@/hooks/useAIAnalysis'
 import { useComplaints } from '@/hooks/useComplaints'
+import { useTranslation } from '@/i18n/LanguageContext'
 import { toApiError } from '@/types/errors'
 
 export default function ReportDetail() {
   const { id } = useParams<{ id: string }>()
   const reportId = Number(id)
   const navigate = useNavigate()
+  const t = useTranslation()
 
   const { data: report, isLoading, isError, refetch } = useReport(reportId)
   const analysisQuery = useAIAnalysis(reportId)
@@ -48,7 +51,7 @@ export default function ReportDetail() {
   if (isError || !report) {
     return (
       <AppShell title="Report">
-        <ErrorState message="We couldn't load this report." onRetry={() => refetch()} />
+        <ErrorState message={t('reports.detail.loadError')} onRetry={() => refetch()} />
       </AppShell>
     )
   }
@@ -83,41 +86,35 @@ export default function ReportDetail() {
         <div className="flex flex-wrap items-center gap-2">
           {isDraft && (
             <>
-              <Link to={`/reports/${report.id}/edit`}>
-                <Button variant="outline" size="sm">
-                  <Pencil className="size-4" aria-hidden="true" />
-                  Edit
-                </Button>
-              </Link>
+              <LinkButton to={`/reports/${report.id}/edit`} variant="outline" size="sm">
+                <Pencil className="size-4" aria-hidden="true" />
+                {t('reports.detail.edit')}
+              </LinkButton>
               <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
                 <Trash2 className="size-4" aria-hidden="true" />
-                Delete
+                {t('reports.detail.delete')}
               </Button>
               <Button size="sm" isLoading={submitReport.isPending} onClick={handleSubmit}>
                 <Send className="size-4" aria-hidden="true" />
-                Submit for Review
+                {t('reports.detail.submitForReview')}
               </Button>
             </>
           )}
           {isSubmittedStatus && !linkedComplaint && (
-            <Link to={`/complaints/new?reportId=${report.id}`}>
-              <Button size="sm" variant="outline">
-                <MessageSquare className="size-4" aria-hidden="true" />
-                File a Complaint
-              </Button>
-            </Link>
+            <LinkButton to={`/complaints/new?reportId=${report.id}`} size="sm" variant="outline">
+              <MessageSquare className="size-4" aria-hidden="true" />
+              File a Complaint
+            </LinkButton>
           )}
-          <Link to={`/reports/${report.id}/ai-analysis`}>
-            <Button size="sm" variant="ghost">
-              <Sparkles className="size-4" aria-hidden="true" />
-              Full AI Assessment
-            </Button>
-          </Link>
+          <LinkButton to={`/reports/${report.id}/ai-analysis`} size="sm" variant="ghost">
+            <Sparkles className="size-4" aria-hidden="true" />
+            Full AI Assessment
+          </LinkButton>
         </div>
 
         {isDraft && (
           <p className="rounded-lg bg-warning-50 px-4 py-2.5 text-sm text-warning-700">
-            This report is a draft. An evidence photo is required before it can be submitted for review.
+            {t('reports.detail.draftNotice')}
           </p>
         )}
 
@@ -179,9 +176,9 @@ export default function ReportDetail() {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Delete this draft report?"
-        description="This action cannot be undone."
-        confirmLabel="Delete"
+        title={t('reports.detail.deleteConfirmTitle')}
+        description={t('reports.detail.deleteConfirmDescription')}
+        confirmLabel={t('reports.detail.delete')}
         destructive
         isLoading={deleteReport.isPending}
         onConfirm={handleDelete}

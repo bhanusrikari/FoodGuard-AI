@@ -104,6 +104,28 @@ class UserResponseSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class UpdatePreferredLanguageSerializer(serializers.Serializer):
+    """
+    Validates a `preferred_language` update for the authenticated user.
+
+    Deliberately narrow — this is not a general profile-update endpoint,
+    just the one field the frontend's language selector needs to persist
+    server-side (see docs/... multilingual architecture notes). Extending
+    it to other profile fields is a separate decision, not bundled in here.
+    """
+
+    preferred_language = serializers.CharField(required=True)
+
+    def validate_preferred_language(self, value: str) -> str:
+        valid_codes = [lang[0] for lang in User.Language.choices]
+        if value not in valid_codes:
+            raise serializers.ValidationError(
+                f"'{value}' is not a supported language. "
+                f"Choose from: {', '.join(valid_codes)}."
+            )
+        return value
+
+
 class LoginSerializer(serializers.Serializer):
     """
     Validates email + password credentials.

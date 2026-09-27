@@ -30,6 +30,8 @@ import ReviewerComplaintsList from '@/pages/reviewer/ReviewerComplaintsList'
 import ReviewerComplaintDetail from '@/pages/reviewer/ReviewerComplaintDetail'
 import ReviewerRestaurants from '@/pages/reviewer/ReviewerRestaurants'
 
+import AdminDashboard from '@/pages/admin/AdminDashboard'
+
 export default function App() {
   return (
     <Routes>
@@ -243,6 +245,20 @@ export default function App() {
           <ProtectedRoute>
             <RoleGuard allow={['REVIEWER', 'ADMIN']}>
               <ReviewerRestaurants />
+            </RoleGuard>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin — platform-level dashboard; reuses reviewer routes above for
+          reports/complaints/restaurants management (those already allow
+          ADMIN via RoleGuard), so nothing there needed to change. */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <RoleGuard allow={['ADMIN']}>
+              <AdminDashboard />
             </RoleGuard>
           </ProtectedRoute>
         }

@@ -12,8 +12,10 @@ import { Reveal } from '@/components/motion/Reveal'
 import { useReports } from '@/hooks/useReports'
 import { useComplaints } from '@/hooks/useComplaints'
 import { useRestaurants } from '@/hooks/useRestaurants'
+import { useTranslation } from '@/i18n/LanguageContext'
 
 export default function ReviewerDashboard() {
+  const t = useTranslation()
   const reportsQuery = useReports()
   const complaintsQuery = useComplaints()
   const restaurantsQuery = useRestaurants()
@@ -29,8 +31,8 @@ export default function ReviewerDashboard() {
   return (
     <AppShell title="Reviewer Dashboard">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-neutral-900">Operations overview</h2>
-        <p className="mt-1 text-sm text-neutral-500">Reports, complaints, and restaurants awaiting your attention.</p>
+        <h2 className="text-xl font-semibold text-neutral-900">{t('dashboard.reviewer.heading')}</h2>
+        <p className="mt-1 text-sm text-neutral-500">{t('dashboard.reviewer.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

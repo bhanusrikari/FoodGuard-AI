@@ -14,4 +14,7 @@ export const queryKeys = {
   aiAnalysis: {
     detail: (reportId: number) => ['ai-analysis', reportId] as const,
   },
+  analytics: {
+    summary: ['analytics', 'summary'] as const,
+  },
 }

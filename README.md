@@ -17,7 +17,18 @@ Steps 1 – 9 complete:
 - Complaint management system with multilingual language preservation
 - Complaint escalation management (application-level workflow only)
 - Customer feedback for resolved/closed complaints
-- Dataset acquisition plan, directory structure, and validation foundation (no data downloaded)
+- Dataset specification, acquisition plan, collection infrastructure, manifest
+  validation, and leakage-detection tooling (`docs/datasets/` — no data
+  downloaded, no images collected yet; see `docs/datasets/ACQUISITION_PLAN.md`)
+- ML training/evaluation pipeline and Django-inference-compatibility tests
+  (`src/ml/`, `docs/ml/TRAINING_PIPELINE.md`) — **pipeline ready, no model
+  trained, no model validated** (see that document's Status table)
+- Dedicated Admin dashboard (frontend `/admin`, real data from the existing
+  `analytics/summary/` endpoint) — Admin previously shared the Reviewer UI
+- Frontend automated test suite (Vitest + React Testing Library) — none
+  existed before this pass
+- Multilingual support (English/Telugu/Hindi) — see "Multilingual Support"
+  below for exactly what's implemented vs. architecturally-supported-only
 
 ---
 
@@ -30,7 +41,6 @@ Steps 1 – 9 complete:
 | Django REST Framework | 3.17.1 |
 | djangorestframework-simplejwt | 5.5.1 |
 | django-cors-headers | 4.9.0 |
-| django-environ | 0.14.0 |
 | psycopg2-binary | 2.9.10 |
 | Pillow | 11.3.0 |
 | PostgreSQL | 16 |
@@ -195,6 +205,7 @@ AI explanations, and complaint responses. Original user-entered content
 | `POST` | `/api/v1/auth/login/` | Public | Obtain JWT tokens |
 | `POST` | `/api/v1/auth/token/refresh/` | Public | Rotate refresh token |
 | `GET` | `/api/v1/auth/profile/` | JWT | Current user profile |
+| `PATCH` | `/api/v1/auth/profile/` | JWT | Update `preferred_language` only — powers the frontend language selector |
 | `POST` | `/api/v1/auth/logout/` | JWT | Blacklist refresh token |
 
 ---
@@ -541,9 +552,78 @@ without overwriting the stored originals.
 provider registry (`TRANSLATION_PROVIDER` env var, default `"none"`). No
 real provider is configured — calling `TranslationService().translate(...)`
 always returns an explicit `status="unavailable"` result (never a fabricated
-translation) until a real provider is registered. Nothing in the codebase
-calls it yet; it exists as the seam for future translation work described
-throughout this README.
+translation) until a real provider is registered. This is for arbitrary
+**user-generated** text (report/complaint descriptions) — nothing in the
+codebase calls it yet.
+
+`translation/strings.py` is a *different* mechanism: a static catalog of
+**fixed, backend-authored** strings (AI analysis explanations, a few
+notification templates) translated ahead of time into English/Telugu/Hindi
+— no provider needed, since these are strings the project itself wrote, not
+arbitrary user text. See "Multilingual Support" below for what's actually
+wired up.
+
+---
+
+## Multilingual Support
+
+Treated as a core feature, not a bolt-on — but be precise about what that
+means today. English is always the default/fallback.
+
+**Fully implemented:**
+- `User.preferred_language` (backend, `users/models.py`) — 6 codes: en, te,
+  hi, ta, kn, mr — settable at registration and via `PATCH /api/v1/auth/profile/`
+  (new endpoint, this pass; updates only `preferred_language`, nothing else).
+- Frontend i18n architecture (`frontend/src/i18n/`) — centralized translation
+  keys, a `LanguageProvider`/`useTranslation()` hook, localStorage persistence,
+  a Topbar language selector, and real English/Telugu/Hindi translations for:
+  navigation, the login/register pages, the delete-draft confirmation flow,
+  the reviewer/admin dashboard headings, and generic loading/empty/error
+  component text.
+- Backend AI-analysis message translation (`ai_analysis/serializers.py`'s
+  `localized_message`/`message_language` fields) — the fixed per-class
+  explanation text (`normal`/`spoilage_indicator`/`mold_like_growth`/mock/
+  human-review) is translated via `translation/strings.py` based on the
+  requesting user's `preferred_language`, entirely downstream of inference —
+  classification, confidence, and risk are never touched by this.
+- Backend notification message translation for 3 of 7 event types
+  (`REPORT_SUBMITTED`, `AI_ANALYSIS_COMPLETED`, `COMPLAINT_SUBMITTED`) —
+  the other 4 (status-change/escalation events) honestly fall back to the
+  original English `message` rather than guess a translation for text that
+  can't be reconstructed from current data (see `notifications/serializers.py`
+  for why).
+
+**Partially implemented:**
+- Frontend UI translation covers the surfaces listed above, not every string
+  in the app — most page bodies, forms, and table content are still
+  English-only. Extending coverage is mechanical (add a key, translate it,
+  call `t()`) but wasn't done exhaustively in this pass.
+- Notification translation covers 3/7 event types, as above.
+
+**Architecturally supported, not yet built:**
+- Tamil, Kannada, Marathi — the backend `User.Language` field and the
+  frontend `LanguageCode` type already include them; there is simply no
+  translation dictionary for them yet (frontend `SUPPORTED_UI_LANGUAGES`,
+  backend `translation/strings.SUPPORTED_LANGUAGES`). Adding one is adding a
+  dictionary file, not restructuring anything.
+- Translating arbitrary user-generated content (report/complaint text) — the
+  seam exists (`TranslationService`) but has no real provider.
+
+**Provider-dependent:**
+- Nothing here needs an external provider — the whole implementation above
+  is static-catalog-based, deliberately avoiding a dependency on
+  credentials that don't exist. `TranslationService` remains the seam for
+  if/when a real provider is added for user-generated content.
+
+**Known limitations:**
+- The Telugu/Hindi translations (both frontend and backend) were written
+  directly for this project, not by a native-speaker linguist or a
+  professional translation service — treat as an MVP-quality first pass,
+  not a final, reviewed localization.
+- `message_language` on an AI analysis result reports which language
+  `localized_message` is actually in — always check it rather than assuming
+  the requested language was honored, since unsupported languages fall back
+  to English.
 
 ---
 
@@ -594,9 +674,12 @@ OpenAPI schema and interactive docs (via `drf-spectacular`):
   it.
 - `GET /healthz/` — unauthenticated container health check (verifies DB
   connectivity).
-- **Known gap**: Django only serves `/media/` when `DEBUG=True`. A real
-  deployment needs nginx / whitenoise / object storage in front of the
-  container for uploaded report images to be reachable at all.
+- Media serving: `/media/` is now served in production too by default
+  (`SERVE_MEDIA_VIA_DJANGO`, default `True` — see `config/settings.py` and
+  `config/urls.py`), so uploaded report images are reachable without
+  DEBUG. This is a pragmatic MVP-scale solution, not the efficient one —
+  set `SERVE_MEDIA_VIA_DJANGO=False` once nginx / a CDN / object storage
+  takes over serving `/media/` directly ahead of real traffic.
 - The real `model.pt` is never baked into the image — mount it as a volume
   at `FOOD_QUALITY_MODEL_DIR` once a real trained model exists.
 
@@ -638,6 +721,52 @@ python manage.py test translation --verbosity 2
 
 # Full suite
 python manage.py test --verbosity 1
+```
+
+All `manage.py test` commands above require a running PostgreSQL instance
+(`docker-compose up foodguard_db_new`, or an equivalent local Postgres on
+port 5434) — Django creates/destroys a test database against it.
+`ai_analysis/test_inference.py` is the one exception: it's designed to run
+standalone, without a database, via `python -m ai_analysis.test_inference`.
+
+Dataset-tooling and ML-pipeline tests (`src/data/dataset_tools/`, `src/ml/`)
+need no database at all:
+
+```bash
+# Dataset manifest/leakage tooling (40 tests)
+python -m unittest src.data.dataset_tools.tests.test_schema src.data.dataset_tools.tests.test_validate_manifest src.data.dataset_tools.tests.test_check_leakage
+
+# ML pipeline (config/labels/transforms/model/manifest/splitting/checkpointing/metrics/artifacts + a full synthetic end-to-end training run — 72 tests)
+python -m unittest src.ml.tests.test_labels src.ml.tests.test_config src.ml.tests.test_metrics src.ml.tests.test_splitting src.ml.tests.test_manifest_dataset src.ml.tests.test_transforms src.ml.tests.test_model src.ml.tests.test_checkpointing src.ml.tests.test_artifacts src.ml.tests.test_train_integration
+
+# Inference-compatibility proof (4 tests) — run on its own, sets FOOD_QUALITY_MODEL_DIR + calls django.setup() as a module-level side effect
+python -m src.ml.tests.test_inference_compatibility
+```
+
+See `docs/ml/TRAINING_PIPELINE.md` for how to run a real training job once
+legitimate data exists, and `docs/datasets/COLLECTION_README.md` for the
+manifest/leakage tooling's own usage.
+
+Multilingual system-string catalog and its wiring into AI analysis /
+notifications also need no database (DB-free, real assertions, not just
+"written but blocked"):
+
+```bash
+python -m unittest translation.test_strings          # 18 tests — the catalog itself
+python -m unittest ai_analysis.test_translation       # 16 tests — localized_message/message_language
+python -m unittest notifications.test_translation     # 11 tests — same, for notifications
+```
+
+Frontend automated tests (Vitest + React Testing Library — added this
+pass; previously there was no frontend test setup at all):
+
+```bash
+cd frontend
+npm run test            # 57 tests: auth/login, role routing, delete-draft UX,
+                         # report list states, form validation, language switching
+npx tsc -b --noEmit      # typecheck
+npm run lint             # oxlint
+npm run build            # production build
 ```
 
 ---

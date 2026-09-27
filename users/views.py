@@ -12,6 +12,7 @@ from users.serializers import (
     LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
+    UpdatePreferredLanguageSerializer,
     UserResponseSerializer,
 )
 
@@ -118,9 +119,14 @@ class LoginView(APIView):
 
 class ProfileView(APIView):
     """
-    GET /api/v1/auth/profile/
+    GET   /api/v1/auth/profile/
+    PATCH /api/v1/auth/profile/
 
     JWT required. Returns full profile — never password.
+
+    PATCH accepts only `preferred_language` — the one field the frontend's
+    language selector needs to persist across sessions/devices. It is not
+    a general profile-edit endpoint.
     """
 
     permission_classes = [IsAuthenticated]
@@ -129,6 +135,21 @@ class ProfileView(APIView):
     def get(self, request: Request) -> Response:
         serializer = UserResponseSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=UpdatePreferredLanguageSerializer,
+        responses={200: UserResponseSerializer, 400: dict},
+        description="Updates the authenticated user's preferred_language only.",
+    )
+    def patch(self, request: Request) -> Response:
+        serializer = UpdatePreferredLanguageSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.preferred_language = serializer.validated_data["preferred_language"]
+        request.user.save(update_fields=["preferred_language", "updated_at"])
+
+        return Response(UserResponseSerializer(request.user).data, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):

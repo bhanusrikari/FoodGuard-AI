@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { MessageSquare } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { ComplaintCard } from '@/components/complaints/ComplaintCard'
@@ -6,7 +5,7 @@ import { Reveal } from '@/components/motion/Reveal'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { ListSkeleton } from '@/components/states/LoadingSkeleton'
-import { Button } from '@/components/ui/Button'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { useComplaints } from '@/hooks/useComplaints'
 
 export default function ComplaintsList() {
@@ -19,9 +18,7 @@ export default function ComplaintsList() {
           <h2 className="text-xl font-semibold text-neutral-900">Your complaints</h2>
           <p className="mt-1 text-sm text-neutral-500">Formal complaints filed against submitted reports.</p>
         </div>
-        <Link to="/complaints/new">
-          <Button>File a Complaint</Button>
-        </Link>
+        <LinkButton to="/complaints/new">File a Complaint</LinkButton>
       </div>
 
       {isLoading && <ListSkeleton items={4} />}
@@ -31,11 +28,7 @@ export default function ComplaintsList() {
           icon={<MessageSquare className="size-6" aria-hidden="true" />}
           title="No complaints filed yet"
           description="Complaints can be filed once a food safety report has been submitted for review."
-          action={
-            <Link to="/complaints/new">
-              <Button size="sm">File a Complaint</Button>
-            </Link>
-          }
+          action={<LinkButton to="/complaints/new" size="sm">File a Complaint</LinkButton>}
         />
       )}
       {isSuccess && data.length > 0 && (

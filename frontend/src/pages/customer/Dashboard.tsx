@@ -8,7 +8,7 @@ import { ComplaintCard } from '@/components/complaints/ComplaintCard'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { ListSkeleton } from '@/components/states/LoadingSkeleton'
-import { Button } from '@/components/ui/Button'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { Reveal } from '@/components/motion/Reveal'
 import { useAuth } from '@/context/AuthContext'
 import { useReports } from '@/hooks/useReports'
@@ -44,12 +44,10 @@ export default function Dashboard() {
               Here's what's happening with your reports and complaints.
             </p>
           </div>
-          <Link to="/reports/new">
-            <Button size="lg">
-              <Plus className="size-4" aria-hidden="true" />
-              New Report
-            </Button>
-          </Link>
+          <LinkButton to="/reports/new" size="lg">
+            <Plus className="size-4" aria-hidden="true" />
+            New Report
+          </LinkButton>
         </div>
       </Reveal>
 
@@ -85,11 +83,7 @@ export default function Dashboard() {
               icon={<FileText className="size-6" aria-hidden="true" />}
               title="No food safety reports yet"
               description="If you've experienced a food safety concern, you can report it here."
-              action={
-                <Link to="/reports/new">
-                  <Button size="sm">Create Report</Button>
-                </Link>
-              }
+              action={<LinkButton to="/reports/new" size="sm">Create Report</LinkButton>}
             />
           )}
           {reportsQuery.isSuccess && reports.length > 0 && (

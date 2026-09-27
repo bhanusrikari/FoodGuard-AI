@@ -6,6 +6,7 @@ import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
+import { useTranslation } from '@/i18n/LanguageContext'
 import { loginSchema, type LoginFormValues } from '@/lib/schemas'
 import { defaultRouteForRole } from '@/lib/roles'
 import { toApiError } from '@/types/errors'
@@ -14,6 +15,7 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const t = useTranslation()
   const [formError, setFormError] = useState<string | null>(null)
 
   const registeredEmail = (location.state as { registeredEmail?: string } | null)?.registeredEmail
@@ -40,15 +42,15 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your FoodGuard AI account">
+    <AuthLayout title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
       {registeredEmail && (
         <p className="mb-4 rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700">
-          Account created. Please sign in.
+          {t('auth.login.accountCreated')}
         </p>
       )}
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <Input
-          label="Email"
+          label={t('auth.login.email')}
           type="email"
           autoComplete="email"
           required
@@ -56,7 +58,7 @@ export default function Login() {
           {...register('email')}
         />
         <Input
-          label="Password"
+          label={t('auth.login.password')}
           type="password"
           autoComplete="current-password"
           required
@@ -69,13 +71,13 @@ export default function Login() {
           </p>
         )}
         <Button type="submit" className="w-full" isLoading={isSubmitting}>
-          Sign in
+          {t('auth.login.submit')}
         </Button>
       </form>
       <p className="mt-6 text-center text-sm text-neutral-500">
-        Don't have an account?{' '}
+        {t('auth.login.noAccount')}{' '}
         <Link to="/register" className="font-medium text-primary-700 hover:underline">
-          Create one
+          {t('auth.login.createOne')}
         </Link>
       </p>
     </AuthLayout>

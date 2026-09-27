@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import {
   Camera,
   ClipboardCheck,
@@ -11,7 +10,7 @@ import {
   MessageSquareWarning,
   ArrowRight,
 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { Reveal } from '@/components/motion/Reveal'
 import { FeatureCard } from '@/components/marketing/FeatureCard'
 import { useParallax } from '@/hooks/useParallax'
@@ -69,12 +68,8 @@ export default function Landing() {
           <span className="text-lg font-semibold text-neutral-900">FoodGuard AI</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link to="/login">
-            <Button variant="ghost">Sign in</Button>
-          </Link>
-          <Link to="/register">
-            <Button>Get started</Button>
-          </Link>
+          <LinkButton to="/login" variant="ghost">Sign in</LinkButton>
+          <LinkButton to="/register">Get started</LinkButton>
         </div>
       </header>
 
@@ -139,14 +134,10 @@ export default function Landing() {
             </Reveal>
             <Reveal delay={240}>
               <div className="mt-8 flex items-center justify-center gap-3">
-                <Link to="/register">
-                  <Button size="lg">Create a report</Button>
-                </Link>
-                <Link to="/login">
-                  <Button size="lg" variant="outline">
-                    Sign in
-                  </Button>
-                </Link>
+                <LinkButton to="/register" size="lg">Create a report</LinkButton>
+                <LinkButton to="/login" size="lg" variant="outline">
+                  Sign in
+                </LinkButton>
               </div>
             </Reveal>
           </div>
@@ -205,12 +196,10 @@ export default function Landing() {
                 Create your account and file your first report in minutes.
               </p>
               <div className="relative mt-7 flex items-center justify-center gap-3">
-                <Link to="/register">
-                  <Button size="lg">
-                    Get started
-                    <ArrowRight className="size-4" aria-hidden="true" />
-                  </Button>
-                </Link>
+                <LinkButton to="/register" size="lg">
+                  Get started
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </LinkButton>
               </div>
             </div>
           </Reveal>

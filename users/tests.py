@@ -433,3 +433,66 @@ class TestLogout(APITestCase):
             REFRESH_URL, {"refresh": self.refresh_token}, format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ======================================================================
+# 8. Update preferred language (PATCH /profile/)
+# ======================================================================
+
+class TestUpdatePreferredLanguage(APITestCase):
+    """Focused tests for the multilingual-selector persistence endpoint
+    added to support docs/... frontend language selector — PATCH accepts
+    only preferred_language, nothing else on the user record."""
+
+    def setUp(self):
+        self.user = make_user(preferred_language=User.Language.ENGLISH)
+        refresh = RefreshToken.for_user(self.user)
+        self.access_token = str(refresh.access_token)
+
+    def _auth(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+    def test_requires_authentication(self):
+        response = self.client.patch(PROFILE_URL, {"preferred_language": "te"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_updates_to_telugu(self):
+        self._auth()
+        response = self.client.patch(PROFILE_URL, {"preferred_language": "te"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["preferred_language"], "te")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.preferred_language, "te")
+
+    def test_updates_to_hindi(self):
+        self._auth()
+        response = self.client.patch(PROFILE_URL, {"preferred_language": "hi"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["preferred_language"], "hi")
+
+    def test_rejects_unsupported_language_code(self):
+        self._auth()
+        response = self.client.patch(PROFILE_URL, {"preferred_language": "fr"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.preferred_language, User.Language.ENGLISH)
+
+    def test_rejects_missing_field(self):
+        self._auth()
+        response = self.client.patch(PROFILE_URL, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_does_not_allow_changing_other_fields(self):
+        """PATCH /profile/ must only ever touch preferred_language — role
+        escalation or identity tampering via this endpoint must not work."""
+        self._auth()
+        response = self.client.patch(
+            PROFILE_URL,
+            {"preferred_language": "te", "role": User.Role.ADMIN, "email": "hijacked@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.role, User.Role.CUSTOMER)
+        self.assertEqual(self.user.email, "test@example.com")
+        self.assertEqual(self.user.preferred_language, "te")

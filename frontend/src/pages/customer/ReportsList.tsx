@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { FileText, Plus } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { ReportCard } from '@/components/reports/ReportCard'
@@ -7,9 +6,10 @@ import { Reveal } from '@/components/motion/Reveal'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { ListSkeleton } from '@/components/states/LoadingSkeleton'
-import { Button } from '@/components/ui/Button'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { Select } from '@/components/ui/Select'
 import { useReports } from '@/hooks/useReports'
+import { useTranslation } from '@/i18n/LanguageContext'
 import type { ReportStatus } from '@/types/report'
 
 const STATUS_FILTERS: Array<{ label: string; value: ReportStatus | 'ALL' }> = [
@@ -24,6 +24,7 @@ const STATUS_FILTERS: Array<{ label: string; value: ReportStatus | 'ALL' }> = [
 export default function ReportsList() {
   const { data, isLoading, isError, isSuccess, refetch } = useReports()
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'ALL'>('ALL')
+  const t = useTranslation()
 
   const reports = useMemo(() => {
     const all = data ?? []
@@ -34,15 +35,13 @@ export default function ReportsList() {
     <AppShell title="Reports">
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-xl font-semibold text-neutral-900">Your food safety reports</h2>
-          <p className="mt-1 text-sm text-neutral-500">Track every report you've filed, from draft to resolution.</p>
+          <h2 className="text-xl font-semibold text-neutral-900">{t('reports.list.heading')}</h2>
+          <p className="mt-1 text-sm text-neutral-500">{t('reports.list.subtitle')}</p>
         </div>
-        <Link to="/reports/new">
-          <Button>
-            <Plus className="size-4" aria-hidden="true" />
-            New Report
-          </Button>
-        </Link>
+        <LinkButton to="/reports/new">
+          <Plus className="size-4" aria-hidden="true" />
+          {t('reports.list.new')}
+        </LinkButton>
       </div>
 
       {isSuccess && (data?.length ?? 0) > 0 && (
@@ -62,21 +61,17 @@ export default function ReportsList() {
       )}
 
       {isLoading && <ListSkeleton items={4} />}
-      {isError && <ErrorState message="We couldn't load your reports." onRetry={() => refetch()} />}
+      {isError && <ErrorState message={t('reports.list.loadError')} onRetry={() => refetch()} />}
       {isSuccess && (data?.length ?? 0) === 0 && (
         <EmptyState
           icon={<FileText className="size-6" aria-hidden="true" />}
-          title="No food safety reports yet"
-          description="If you've experienced a food safety concern, you can report it here."
-          action={
-            <Link to="/reports/new">
-              <Button size="sm">Create Report</Button>
-            </Link>
-          }
+          title={t('reports.list.emptyTitle')}
+          description={t('reports.list.emptyDescription')}
+          action={<LinkButton to="/reports/new" size="sm">{t('reports.list.createAction')}</LinkButton>}
         />
       )}
       {isSuccess && (data?.length ?? 0) > 0 && reports.length === 0 && (
-        <EmptyState title="No reports match this filter" description="Try a different status filter." />
+        <EmptyState title={t('reports.list.emptyFilterTitle')} description={t('reports.list.emptyFilterDescription')} />
       )}
       {reports.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

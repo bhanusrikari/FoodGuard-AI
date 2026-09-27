@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useTranslation } from '@/i18n/LanguageContext'
 import { BRAND, getNavItems } from './navConfig'
 import type { UserRole } from '@/types/user'
 
@@ -12,6 +13,7 @@ interface MobileNavProps {
 
 export function MobileNav({ role, open, onClose }: MobileNavProps) {
   const items = getNavItems(role)
+  const t = useTranslation()
 
   if (!open) return null
 
@@ -27,7 +29,7 @@ export function MobileNav({ role, open, onClose }: MobileNavProps) {
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close menu"
+            aria-label={t('topbar.closeMenu')}
             className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100"
           >
             <X className="size-5" aria-hidden="true" />
@@ -48,7 +50,7 @@ export function MobileNav({ role, open, onClose }: MobileNavProps) {
               }
             >
               <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>

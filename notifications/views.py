@@ -21,7 +21,10 @@ class NotificationListView(APIView):
         qs = Notification.objects.filter(recipient=request.user).select_related(
             "related_report", "related_complaint"
         )
-        return Response(NotificationSerializer(qs, many=True).data, status=status.HTTP_200_OK)
+        return Response(
+            NotificationSerializer(qs, many=True, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 @extend_schema_view(
@@ -62,4 +65,7 @@ class NotificationDetailView(APIView):
 
         notification.is_read = is_read
         notification.save(update_fields=["is_read"])
-        return Response(NotificationSerializer(notification).data, status=status.HTTP_200_OK)
+        return Response(
+            NotificationSerializer(notification, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )

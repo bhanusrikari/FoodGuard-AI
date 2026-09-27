@@ -7,8 +7,9 @@ export function defaultRouteForRole(role: UserRole): string {
     case 'RESTAURANT_USER':
       return '/restaurant'
     case 'REVIEWER':
-    case 'ADMIN':
       return '/reviewer'
+    case 'ADMIN':
+      return '/admin'
     default:
       return '/'
   }

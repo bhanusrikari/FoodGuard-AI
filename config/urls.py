@@ -2,10 +2,12 @@
 FoodGuard AI — root URL configuration.
 """
 
+import re
+
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve as serve_static
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -54,6 +56,23 @@ urlpatterns = [
     path("api/v1/analytics/", include("analytics.urls", namespace="analytics")),
 ]
 
-# Serve uploaded media files during development (DEBUG=True only)
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve uploaded media files. Always on in development (DEBUG=True); in
+# production this stays on by default too (SERVE_MEDIA_VIA_DJANGO, see
+# config/settings.py) until a reverse proxy / object storage takes over —
+# without this, uploaded report images are unreachable in production, which
+# was an open gap (see Dockerfile and README "Deployment" section).
+#
+# Deliberately NOT using django.conf.urls.static.static() here: that
+# helper hardcodes `if not settings.DEBUG: return []` internally, so it
+# silently serves nothing outside DEBUG no matter what condition wraps the
+# call. django.views.static.serve is wired directly instead, exactly as
+# Django's own docs describe for a small deployment that isn't yet putting
+# a reverse proxy / object storage in front of media.
+if settings.DEBUG or settings.SERVE_MEDIA_VIA_DJANGO:
+    urlpatterns += [
+        re_path(
+            r"^%s(?P<path>.*)$" % re.escape(settings.MEDIA_URL.lstrip("/")),
+            serve_static,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]

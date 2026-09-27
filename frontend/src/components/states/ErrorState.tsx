@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { Reveal } from '@/components/motion/Reveal'
+import { useTranslation } from '@/i18n/LanguageContext'
 
 interface ErrorStateProps {
   title?: string
@@ -10,12 +11,8 @@ interface ErrorStateProps {
   className?: string
 }
 
-export function ErrorState({
-  title = "We couldn't load this data.",
-  message = 'Something went wrong while talking to the server. Please try again.',
-  onRetry,
-  className,
-}: ErrorStateProps) {
+export function ErrorState({ title, message, onRetry, className }: ErrorStateProps) {
+  const t = useTranslation()
   return (
     <Reveal variant="fade">
       <div
@@ -27,11 +24,11 @@ export function ErrorState({
         <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-white text-danger-600">
           <AlertTriangle className="size-6" aria-hidden="true" />
         </div>
-        <h3 className="text-base font-semibold text-neutral-900">{title}</h3>
-        <p className="mt-1.5 max-w-sm text-sm text-neutral-600">{message}</p>
+        <h3 className="text-base font-semibold text-neutral-900">{title ?? t('state.errorTitle')}</h3>
+        <p className="mt-1.5 max-w-sm text-sm text-neutral-600">{message ?? t('state.errorMessage')}</p>
         {onRetry && (
           <Button variant="outline" className="mt-5" onClick={onRetry}>
-            Try Again
+            {t('common.tryAgain')}
           </Button>
         )}
       </div>

@@ -11,9 +11,6 @@ djangorestframework-simplejwt==5.5.1
 # CORS
 django-cors-headers==4.9.0
 
-# Environment variables
-django-environ==0.14.0
-
 # Database
 psycopg2-binary==2.9.10
 

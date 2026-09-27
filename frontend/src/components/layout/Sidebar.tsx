@@ -1,10 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/cn'
+import { useTranslation } from '@/i18n/LanguageContext'
 import { BRAND, getNavItems } from './navConfig'
 import type { UserRole } from '@/types/user'
 
 export function Sidebar({ role }: { role: UserRole }) {
   const items = getNavItems(role)
+  const t = useTranslation()
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-neutral-100 bg-white lg:flex">
@@ -31,7 +33,7 @@ export function Sidebar({ role }: { role: UserRole }) {
               className="size-4.5 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5"
               aria-hidden="true"
             />
-            {item.label}
+            {t(item.labelKey)}
           </NavLink>
         ))}
       </nav>

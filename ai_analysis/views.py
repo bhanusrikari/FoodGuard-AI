@@ -68,7 +68,7 @@ class AnalyzeReportView(APIView):
             )
 
         return Response(
-            AIAnalysisSerializer(analysis).data,
+            AIAnalysisSerializer(analysis, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -107,6 +107,6 @@ class ReportAnalysisView(APIView):
             )
 
         return Response(
-            AIAnalysisSerializer(analysis).data,
+            AIAnalysisSerializer(analysis, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
