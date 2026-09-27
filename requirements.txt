@@ -13,6 +13,13 @@ django-cors-headers==4.9.0
 
 # Database
 psycopg2-binary==2.9.10
+dj-database-url==3.0.1
+
+# Production static file serving (no-op unless DEBUG=False + collectstatic run)
+whitenoise==6.11.0
+
+# Production WSGI server
+gunicorn==23.0.0
 
 # Image processing
 Pillow==11.3.0

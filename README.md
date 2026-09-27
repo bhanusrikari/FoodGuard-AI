@@ -475,16 +475,35 @@ either way.
 | `FOOD_QUALITY_MODEL_DIR` | `FOOD_QUALITY_MODEL_DIR` | `<project_root>/models/food_quality/` | Directory containing `model.pt`, `label_map.json`, `train_config.json` |
 | `AI_CONFIDENCE_THRESHOLD` | `AI_CONFIDENCE_THRESHOLD` | `0.70` | Below this confidence, the result is forced to `risk=HUMAN_REVIEW` regardless of predicted class |
 
-**Current status on this machine: the real model artifacts do not exist.**
+**Current status: a SYNTHETIC DEVELOPMENT model exists at
+`FOOD_QUALITY_MODEL_DIR`; a real, food-trained model does not.**
+
+> ⚠️ **SYNTHETIC DEVELOPMENT MODEL — NOT REAL-WORLD PERFORMANCE**
+> `models/food_quality/` currently holds a model trained by
+> `src/ml/train.py` against `data/synthetic/food_quality/manifest.jsonl` —
+> a deterministically generated, clearly-labeled synthetic dataset (see
+> `src/data/synthetic/generate_dataset.py`) used **only** to verify that the
+> training pipeline, checkpointing, artifact format, and Django inference
+> integration actually work end-to-end. It contains no real food images.
+> Any accuracy/precision/recall/F1 numbers this model produces describe its
+> performance on synthetic geometric patterns, not real food, and must
+> never be quoted as FoodGuard accuracy, mold/spoilage detection capability,
+> or evidence of production readiness. See
+> `docs/ml/TRAINING_PIPELINE.md` for the full pipeline-ready vs.
+> model-trained vs. model-validated distinction.
+
 `ai_analysis/inference.py` and its test suite (`ai_analysis/test_inference.py`)
-already implement the real-model path in full (MobileNetV3-Small backbone,
+implement the real-model path in full (MobileNetV3-Small backbone,
 singleton thread-safe CPU-only load, no-grad inference, confidence-gated
-`HUMAN_REVIEW`), but were developed on a different machine whose trained
-`model.pt` was never transferred here. The service falls back to the mock
-below until real artifacts are placed at `FOOD_QUALITY_MODEL_DIR`. Installing
-`torch`/`torchvision` is **not required** to run this backend today — see
-the commented block in `requirements.txt` for the install command once a
-real model is provided.
+`HUMAN_REVIEW`) — `AIAnalysisService` is now actually exercising that code
+path against the synthetic development artifact above, rather than the
+mock fallback, whenever `FOOD_QUALITY_MODEL_DIR` points at it. A real
+model trained on legitimate, licensed, or consented food images has not
+been produced — that remains blocked on dataset acquisition (see
+`docs/datasets/ACQUISITION_PLAN.md`), not on any code or pipeline gap.
+`torch`/`torchvision` are already installed in this project's environment
+(see `requirements.txt`'s AI-inference block for the install command on a
+machine that doesn't have them yet).
 
 ### Model classes (once real model is present)
 
@@ -503,7 +522,12 @@ uncertain guess as if it were definitive.
 
 ### Limitations
 
-- No real trained model exists on this machine (see above).
+- No real, food-trained model exists yet — only the synthetic development
+  model described above (see `docs/ml/TRAINING_PIPELINE.md`'s status table).
+- No real-world evaluation has been performed; the FoodGuard Real-World
+  Holdout Test Set (`docs/datasets/ACQUISITION_PLAN.md` section 6) does not
+  exist yet. Dataset licensing for the candidate public sources is pending
+  (`docs/datasets/ACQUISITION_PLAN.md`).
 - The 3 classes cover food-quality/spoilage/mold only — not the full
   taxonomy planned in `docs/datasets/`.
 - Confidence is a raw softmax score, not a calibrated probability.
@@ -667,21 +691,38 @@ OpenAPI schema and interactive docs (via `drf-spectacular`):
 
 ## Deployment
 
-- `Dockerfile` builds a gunicorn-served backend image. `docker-compose.yml`
-  adds a `backend` service alongside the existing Postgres service.
-- **Not built or run as part of this repository's development so far** —
-  Docker isn't installed in this dev environment; review before relying on
-  it.
-- `GET /healthz/` — unauthenticated container health check (verifies DB
-  connectivity).
-- Media serving: `/media/` is now served in production too by default
+**Full step-by-step guide: `docs/deployment/DEPLOYMENT.md`** (Render
+backend + Render Postgres + Vercel frontend). Summary:
+
+- `render.yaml` — Render Blueprint for the Django backend (native Python
+  runtime, gunicorn, WhiteNoise-served static files, managed Postgres).
+  `requirements-render.txt` adds `torch`/`torchvision` on top of the base
+  `requirements.txt` so the deployed backend can actually run the
+  synthetic development model rather than staying in mock mode.
+- `frontend/vercel.json` — SPA rewrite so React Router's client-side
+  routes don't 404 on a hard refresh.
+- `Dockerfile` / `docker-compose.yml` remain as an alternative,
+  container-based path — **not built or run as part of this repository's
+  development so far** (Docker isn't installed in this dev environment);
+  review before relying on it. Render deployment uses the native Python
+  runtime instead (`render.yaml`), not this Dockerfile.
+- `GET /healthz/` — unauthenticated health check (verifies DB
+  connectivity); used as Render's health check path.
+- Media serving: `/media/` is served in production too by default
   (`SERVE_MEDIA_VIA_DJANGO`, default `True` — see `config/settings.py` and
   `config/urls.py`), so uploaded report images are reachable without
   DEBUG. This is a pragmatic MVP-scale solution, not the efficient one —
   set `SERVE_MEDIA_VIA_DJANGO=False` once nginx / a CDN / object storage
-  takes over serving `/media/` directly ahead of real traffic.
-- The real `model.pt` is never baked into the image — mount it as a volume
-  at `FOOD_QUALITY_MODEL_DIR` once a real trained model exists.
+  takes over serving `/media/` directly ahead of real traffic. **On Render
+  specifically**, the filesystem is ephemeral across deploys, so uploaded
+  images do not survive a redeploy unless a persistent Disk is attached —
+  see `docs/deployment/DEPLOYMENT.md` section 6.
+- The model is never baked into git — `render.yaml`'s build step
+  regenerates the **synthetic development model** (see
+  `docs/ml/TRAINING_PIPELINE.md`) fresh on every deploy so
+  `FOOD_QUALITY_MODEL_DIR` always has a real artifact to load. This is
+  **not a real, food-trained model** — see `docs/deployment/DEPLOYMENT.md`
+  section 4 for the reasoning and the real-model alternative.
 
 ---
 
@@ -694,8 +735,11 @@ python manage.py test feedback --verbosity 2
 # Complaint tests (38 tests)
 python manage.py test complaints --verbosity 2
 
-# AI analysis tests (25 mock-boundary tests; test_inference.py adds real-model
-# tests that report SKIPPED until model.pt/label_map.json exist)
+# AI analysis tests (mock-boundary tests + test_inference.py's real-model
+# tests, which now run for real against the SYNTHETIC DEVELOPMENT model at
+# models/food_quality/ — see "Model configuration" above. They were
+# SKIPPED before any model.pt existed; they are not evidence of real-world
+# accuracy now that one does.)
 python manage.py test ai_analysis --verbosity 2
 
 # All food report tests (39 tests)
@@ -781,12 +825,23 @@ Registered models: User, Restaurant, FoodReport — each with search, filters, a
 
 ## Not Yet Implemented
 
-- Real ML visual food-recognition model — architecture and inference code exist
-  (`ai_analysis/inference.py`), but no trained `model.pt` exists on this machine
-  and no dataset has been collected (see `docs/datasets/` — status: planned)
+- Real ML visual food-recognition model trained on legitimate food images —
+  architecture, training pipeline, and inference code all exist and are
+  proven end-to-end (`ai_analysis/inference.py`, `src/ml/`), but no real
+  food dataset has been collected (see `docs/datasets/` — status: planned).
+  `models/food_quality/` currently holds only a SYNTHETIC DEVELOPMENT model
+  (see the "Model configuration" section above) used to verify the pipeline
+  runs, not a real food-quality classifier.
+- Real-world model evaluation — the FoodGuard Real-World Holdout Test Set
+  does not exist yet (`docs/datasets/ACQUISITION_PLAN.md` section 6);
+  dataset licensing for candidate public sources is still pending.
 - Expanded food-quality classes beyond normal/spoilage/mold (see `docs/datasets/quality_dataset_plan.md`)
 - Food-101 general food recognition, foreign-object/pest/packaging/hygiene datasets
 - A real TranslationService provider (abstraction exists; provider is "none")
 - Evidence (dedicated evidence-attachment model, beyond the FoodReport image)
-- A real deployment (Dockerfile/compose exist but are untested — no Docker on this dev machine)
+- An actual live deployment — `render.yaml`/`requirements-render.txt`/`frontend/vercel.json`
+  and `docs/deployment/DEPLOYMENT.md` prepare and document Render + Vercel
+  deployment, and are verified against the current codebase (see that
+  guide), but nothing has actually been deployed. `Dockerfile`/`docker-compose.yml`
+  remain an alternative, untested path (no Docker on this dev machine).
 - Production media serving (nginx/whitenoise/object storage in front of Django)

@@ -1,0 +1,86 @@
+# Render Blueprint for FoodGuard AI's backend.
+#
+# This deploys the Django API as a native Python web service (no Docker)
+# plus a managed Render PostgreSQL instance. It does NOT deploy the
+# frontend — that goes to Vercel separately (see docs/deployment/DEPLOYMENT.md).
+#
+# IMPORTANT: the build step regenerates the SYNTHETIC DEVELOPMENT model
+# (see docs/ml/TRAINING_PIPELINE.md) from src/data/synthetic/ on every
+# deploy. It is NOT a real, food-trained model and produces no real-world
+# accuracy claim — see README.md's "AI Analysis" section. This keeps
+# model.pt out of git entirely (consistent with this repo's existing
+# .gitignore policy of never committing model binaries) while still
+# guaranteeing AIAnalysisService has a real artifact to load, rather than
+# silently staying in mock mode.
+#
+# The build uses the default pretrained (ImageNet) backbone -- verified
+# locally to converge to a stable classifier within ~4 epochs (~50s on
+# CPU). This requires the Render build environment to reach
+# download.pytorch.org once, same as the PyTorch wheel index already used
+# below; if that's ever blocked, see docs/deployment/DEPLOYMENT.md's
+# troubleshooting section for the offline fallback and why it needs a
+# config.py change (not just a flag) to work well.
+#
+# To deploy: push this repo to a Git provider Render can access, then
+# either "New +" -> "Blueprint" in the Render dashboard pointing at this
+# file, or create the web service and database manually using the same
+# values (see docs/deployment/DEPLOYMENT.md for the manual walkthrough).
+
+databases:
+  - name: foodguard-db
+    plan: free
+    databaseName: foodguard_db
+    user: foodguard_user
+
+services:
+  - type: web
+    name: foodguard-backend
+    runtime: python
+    plan: free
+    region: oregon
+    # NOTE: every continuation line here MUST share the same indentation —
+    # YAML's ">-" folded scalar only joins same-indentation lines with a
+    # space; a MORE-indented line is preserved as a literal newline instead,
+    # which would silently split this into several broken shell commands.
+    buildCommand: >-
+      pip install -r requirements-render.txt &&
+      python manage.py collectstatic --noinput &&
+      python -m src.data.synthetic.generate_dataset &&
+      python -m src.ml.train
+      --manifest data/synthetic/food_quality/manifest.jsonl
+      --data-root data
+      --output-dir models/food_quality
+      --img-size 128
+      --epochs 12
+      --batch-size 16
+      --seed 20260927
+      --device cpu
+    startCommand: >-
+      python manage.py migrate --noinput &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3
+    healthCheckPath: /healthz/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false # set to the assigned onrender.com hostname (and any custom domain)
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false # e.g. https://foodguard-backend.onrender.com,https://<your-app>.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # e.g. https://<your-app>.vercel.app
+      - key: DATABASE_URL
+        fromDatabase:
+          name: foodguard-db
+          property: connectionString
+      - key: AI_CONFIDENCE_THRESHOLD
+        value: "0.70"
+      - key: TRANSLATION_PROVIDER
+        value: "none"
+      - key: SERVE_MEDIA_VIA_DJANGO
+        value: "True"
+      - key: PYTHON_VERSION
+        value: "3.12.8"

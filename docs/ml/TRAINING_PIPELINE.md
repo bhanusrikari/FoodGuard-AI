@@ -1,6 +1,8 @@
 # FoodGuard AI — ML Training Pipeline
 
-> **Current state: PIPELINE READY. MODEL TRAINED: NO. MODEL VALIDATED: NO.**
+> **Current state: PIPELINE READY. SYNTHETIC DEVELOPMENT MODEL TRAINED: YES
+> (see section 5a — not real food data). MODEL TRAINED ON REAL DATA: NO.
+> MODEL VALIDATED: NO.**
 > See "Status" at the bottom before drawing any conclusion from this document.
 
 This is the operating manual for `src/ml/` — the training, evaluation, and
@@ -139,16 +141,51 @@ configured threshold (default `0.70`) is still always forced to
 `HUMAN_REVIEW`, regardless of what the training pipeline produces. Nothing
 in this pipeline adjusts that threshold to make results "look better."
 
+## 5a. Synthetic development model (pipeline verification only)
+
+`src/data/synthetic/generate_dataset.py` generates a deterministic,
+clearly-labeled synthetic dataset under `data/synthetic/food_quality/`
+(never under `data/manifests/food_quality/` or `data/raw/food_quality/`) —
+solid-color fields, polygon blotches, and stippled circles standing in for
+normal/spoilage/mold, with no resemblance to real food photographs. Every
+row in `data/synthetic/food_quality/manifest.jsonl` carries
+`"synthetic": true` and an explicit disclaimer in `annotation_notes`.
+
+Running the real pipeline against it —
+
+```bash
+python -m src.data.synthetic.generate_dataset
+python -m src.ml.train --manifest data/synthetic/food_quality/manifest.jsonl \
+    --data-root data --output-dir models/food_quality --img-size 128
+python -m src.ml.evaluate --model-dir models/food_quality \
+    --manifest data/synthetic/food_quality/manifest.jsonl --data-root data --eval-split test
+```
+
+— proves manifest validation, grouped stratified splitting, MobileNetV3-Small
+training, checkpointing, artifact generation, evaluation metrics, and the
+Django `ai_analysis` inference chain all work end-to-end, and produces the
+real artifact set at `models/food_quality/` (`model.pt`, `label_map.json`,
+`train_config.json`) that `AIAnalysisService` picks up automatically.
+
+**This synthetic development model is not, and must never be described
+as, a real food-quality classifier.** Any precision/recall/F1/accuracy
+number it produces reflects performance on trivially-separable synthetic
+patterns, not real food, and says nothing about real-world mold or
+spoilage detection capability. It exists solely so this pipeline — and the
+Django integration in front of it — can be exercised and demonstrated
+before real data exists.
+
 ## 6. What is still blocked
 
 - **A legitimate training dataset.** `data/manifests/food_quality/manifest.jsonl`
   is currently empty. See `docs/datasets/ACQUISITION_PLAN.md` for the
   public-dataset license questions still pending and the FoodGuard
   self-capture pilot that hasn't started yet.
-- **A trained model.** `models/food_quality/` does not exist in this repo.
-  Nothing under `src/ml/` was run against real project paths — every test
-  above uses synthetic, clearly-marked placeholder data in temp
-  directories.
+- **A trained model on real data.** `models/food_quality/` now contains a
+  model — but one trained on the synthetic dataset described in section 5a,
+  not on real food images. `data/manifests/food_quality/manifest.jsonl` (the
+  real manifest) is still empty; nothing under `src/ml/` has been run
+  against real project data.
 - **A validated model.** Even once real data exists and a training run
   completes, its validation/test metrics are not "production accuracy" —
   only a result against the FoodGuard Real-World Holdout Test Set
@@ -160,7 +197,8 @@ in this pipeline adjusts that threshold to make results "look better."
 | Claim | True? |
 |---|---|
 | **PIPELINE READY** — training/evaluation/inference-integration code exists, is tested, and will run correctly the moment legitimate data is placed under `data/manifests/food_quality/manifest.jsonl` | **Yes** |
-| **MODEL TRAINED** — a real model has been trained on real FoodGuard data | **No** |
+| **SYNTHETIC DEVELOPMENT MODEL TRAINED** — a model has been trained on the synthetic dataset in section 5a, purely to verify this pipeline end-to-end | **Yes — synthetic only, see section 5a** |
+| **MODEL TRAINED ON REAL DATA** — a model has been trained on real FoodGuard food images | **No** |
 | **MODEL VALIDATED** — a trained model has been evaluated against the FoodGuard Real-World Holdout Test Set | **No** |
 
 Do not read anything in this document, or in `src/ml/`, as evidence

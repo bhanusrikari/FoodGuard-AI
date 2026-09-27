@@ -1,0 +1,20 @@
+# FoodGuard AI — Render deployment requirements.
+#
+# Extends the base requirements.txt (kept minimal/mock-mode-capable for
+# local dev and other deployment targets) with the one additional heavy
+# dependency Render's build needs: torch/torchvision, so the AI analysis
+# endpoint actually runs the SYNTHETIC DEVELOPMENT model (see
+# docs/ml/TRAINING_PIPELINE.md) instead of silently staying in mock mode.
+#
+# gunicorn / whitenoise / dj-database-url now live in the base
+# requirements.txt (they're small and always safe to have installed, even
+# in dev) — this file only adds what's genuinely deployment-specific.
+#
+# Usage (Render build command):
+#   pip install -r requirements-render.txt
+
+-r requirements.txt
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0
+torchvision==0.29.0

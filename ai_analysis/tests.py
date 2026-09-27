@@ -14,6 +14,8 @@ import io
 import tempfile
 
 from decimal import Decimal
+from pathlib import Path
+from unittest.mock import patch
 from django.core.exceptions import ValidationError
 from django.test import override_settings
 from PIL import Image as PilImage
@@ -21,11 +23,28 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from ai_analysis import services as ai_services
 from ai_analysis.models import AIAnalysis
 from ai_analysis.services import AIAnalysisService, AnalysisError, _MOCK_RESULT
 from food_reports.models import FoodReport
 from restaurants.models import Restaurant
 from users.models import User
+
+# ai_analysis/services.py resolves _MODEL_PT / _LABEL_MAP once, from
+# settings, at import time -- so whether a machine happens to have a real
+# (or synthetic development) model.pt at FOOD_QUALITY_MODEL_DIR is ambient
+# state these mock-mode tests must not depend on. Patching the two
+# module-level path globals forces the mock branch deterministically,
+# regardless of what's actually on disk on the machine running the suite.
+_NO_MODEL_HERE = Path(tempfile.mkdtemp()) / "no_model_here" / "model.pt"
+
+
+def _force_mock_mode():
+    return patch.multiple(
+        ai_services,
+        _MODEL_PT=_NO_MODEL_HERE,
+        _LABEL_MAP=_NO_MODEL_HERE.with_name("label_map.json"),
+    )
 
 TEMP_MEDIA = tempfile.mkdtemp()
 
@@ -175,14 +194,16 @@ class TestAIAnalysisService(APITestCase):
             self.service.analyze_food_report(self.report_no_image)
 
     def test_13_mock_service_returns_deterministic_result(self):
-        a = self.service.analyze_food_report(self.report_with_image)
+        with _force_mock_mode():
+            a = self.service.analyze_food_report(self.report_with_image)
         self.assertEqual(a.status, AIAnalysis.Status.COMPLETED)
         self.assertEqual(a.risk, _MOCK_RESULT["risk"])
         self.assertEqual(float(a.confidence), _MOCK_RESULT["confidence"])
         self.assertEqual(a.concerns, _MOCK_RESULT["concerns"])
 
     def test_14_mock_model_metadata_is_correct(self):
-        a = self.service.analyze_food_report(self.report_with_image)
+        with _force_mock_mode():
+            a = self.service.analyze_food_report(self.report_with_image)
         self.assertEqual(a.model_name, "mock-foodguard-ai")
         self.assertEqual(a.model_version, "0.1.0")
 
@@ -195,7 +216,8 @@ class TestAIAnalysisService(APITestCase):
 
     def test_24_ai_output_is_preliminary_visual_assessment(self):
         """Message must not claim scientific certainty."""
-        a = self.service.analyze_food_report(self.report_with_image)
+        with _force_mock_mode():
+            a = self.service.analyze_food_report(self.report_with_image)
         # Message must contain the mock indicator, not fabricated certainty
         self.assertIn("mock mode", a.message.lower())
         # Confidence must be 0.0 in mock mode (no fake accuracy)

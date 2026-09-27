@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 import os
 
+import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 
 
@@ -40,6 +41,15 @@ ALLOWED_HOSTS = [
     for h in os.getenv("DJANGO_ALLOWED_HOSTS", _default_allowed_hosts).split(",")
     if h.strip()
 ]
+
+# Trust the reverse proxy's X-Forwarded-* headers (Render, and most other
+# PaaS hosts, terminate TLS in front of the app and forward plain HTTP to
+# this process). Without this, Django can't tell a request arrived over
+# HTTPS, which breaks SECURE_SSL_REDIRECT (redirect loop) and secure-cookie
+# checks. Harmless locally: runserver never sends this header, so it's
+# simply never matched in dev.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 # Production-only hardening. Left off under DEBUG so the local dev workflow
 # (plain HTTP on localhost) is completely unaffected.
@@ -110,6 +120,14 @@ AUTH_USER_MODEL = "users.User"
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
 
+    # Serves STATIC_ROOT directly from the app process — no separate static
+    # file host/CDN needed for this MVP's admin/DRF-browsable-API/Swagger
+    # assets. Must sit immediately after SecurityMiddleware and before
+    # everything else (whitenoise docs). No-op for anything under
+    # MEDIA_URL — uploaded report images keep going through the existing
+    # django.views.static.serve wiring in config/urls.py.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+
     # CORS — must be as high as possible
     "corsheaders.middleware.CorsMiddleware",
 
@@ -158,19 +176,39 @@ ASGI_APPLICATION = "config.asgi.application"
 
 
 # ============================================================
-# DATABASE — PostgreSQL on port 5434 (FoodGuard isolated instance)
+# DATABASE — PostgreSQL
 # ============================================================
+# Local development: individual DATABASE_NAME/USER/PASSWORD/HOST/PORT env
+# vars, unchanged (defaults match the FoodGuard isolated dev instance on
+# port 5434; override DATABASE_PORT for a differently-configured local
+# Postgres, e.g. DATABASE_PORT=5432).
+#
+# Hosted deployment (Render, etc.): set DATABASE_URL and it takes priority
+# over the individual vars — this is exactly the single env var Render
+# injects automatically when a Postgres instance is linked to a web
+# service, so no manual host/port/credential wiring is needed there.
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DATABASE_NAME", "foodguard_db"),
-        "USER": os.getenv("DATABASE_USER", "foodguard_user"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD", "foodguard_password"),
-        "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DATABASE_PORT", "5434"),
+_DATABASE_URL = os.getenv("DATABASE_URL")
+
+if _DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            _DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DATABASE_NAME", "foodguard_db"),
+            "USER": os.getenv("DATABASE_USER", "foodguard_user"),
+            "PASSWORD": os.getenv("DATABASE_PASSWORD", "foodguard_password"),
+            "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
+            "PORT": os.getenv("DATABASE_PORT", "5434"),
+        }
+    }
 
 
 # ============================================================
@@ -221,6 +259,15 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # ============================================================
@@ -311,10 +358,17 @@ SIMPLE_JWT = {
 # ============================================================
 # CORS
 # ============================================================
+# Comma-separated list of allowed frontend origins. Defaults preserve the
+# existing local Vite dev origin; set CORS_ALLOWED_ORIGINS in production to
+# the deployed frontend's actual origin(s), e.g.
+# "https://foodguard.vercel.app,https://www.foodguard.example".
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    o.strip()
+    for o in os.getenv(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if o.strip()
 ]
 
 
