@@ -86,9 +86,21 @@ wandb/
 # ============================================================
 # Exceptions — KEEP directory structure and documentation
 # ============================================================
-# .gitkeep files mark intentionally empty directories
-!data/**/.gitkeep
+# .gitkeep files mark intentionally empty directories and ARE committed.
+#
+# Git cannot "un-ignore" a file whose parent directory is itself excluded
+# by an opaque directory pattern (e.g. "data/processed/") — it never even
+# traverses in to look. So real dataset content under data/ is ignored
+# here using a *file*-matching pattern instead, which does not block
+# traversal, and directory entries are explicitly re-included so Git will
+# walk into them and find the specific .gitkeep exception. This is the
+# actual enforcement for everything under data/ — the more specific
+# patterns above are kept for documentation/clarity but this is what wins.
+# Order matters: these three lines must stay in this order.
+/data/**/*
+!/data/**/
+!/data/**/.gitkeep
+
 !docs/**
 !src/**
-data/
 src/__pycache__/

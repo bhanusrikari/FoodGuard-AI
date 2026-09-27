@@ -1,0 +1,31 @@
+{
+  "_instructions": "Fill in one of these per physical food item BEFORE photographing it. One item_id may have multiple sessions (e.g. re-photographed the next day as spoilage progresses) — give each sitting its own session_id. See docs/datasets/CAPTURE_METADATA_TEMPLATE.md for field definitions and docs/datasets/PILOT_CHECKLIST.md for the first 10-20 images.",
+  "item_id": "<item_NNNNN, sequential, assigned once per physical food item>",
+  "session_id": "<session_a / session_b / ... unique within this item_id only>",
+  "food_category": "<fruit | vegetable | bread_bakery | dairy | cooked_prepared | packaged>",
+  "food_description": "<free text, e.g. 'sliced white bread, half loaf'>",
+  "expected_label_hint": "<annotator's first impression before formal labeling: normal | spoilage_indicator | mold_like_growth | uncertain -- this is NOT the final label, just a capture-time note>",
+  "spoilage_stage_hint": "<early | mid | advanced | n/a>",
+  "packaging_state": "<sealed | opened | through_wrap | n/a>",
+  "capture_context": {
+    "device": "<phone model>",
+    "lighting": "<daylight | indoor_artificial | dim | mixed_shadowed | overexposed>",
+    "background": "<plate | table | packaging | hand_held | countertop | fridge_pantry>",
+    "distance": "<close_up | arm_length>",
+    "angle": "<top_down | 45_degree | side>"
+  },
+  "num_photos_this_session": "<integer>",
+  "photographer_id": "<annotator_id of the person who took the photos>",
+  "consent": {
+    "contributor_type": "<team_member | pilot_participant>",
+    "consent_form_reference": "<filed location OUTSIDE Git, e.g. consent-records/2026-09-27_ann001.pdf -- never store the form itself in this repo>",
+    "consent_confirmed": false
+  },
+  "privacy_check": {
+    "no_faces_or_people_visible": false,
+    "no_names_addresses_or_personal_documents_visible": false,
+    "exif_will_be_stripped_before_storage": false
+  },
+  "collection_date": "<YYYY-MM-DD>",
+  "notes": "<anything unusual about this session>"
+}
